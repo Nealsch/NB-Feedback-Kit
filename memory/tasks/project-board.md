@@ -4,13 +4,13 @@
 
 | Step | Limit | Items |
 |------|-------|-------|
-| Step 0 - To Be Started | ∞ | TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013 |
+| Step 0 - To Be Started | ∞ | TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013 |
 | Step 1 - Discovery | 3 | |
 | Step 2 - Ready | ∞ | |
 | Step 3 - In Development | 1 | |
 | Step 4 - Review | 2 | |
 | Step 5 - Testing | 2 | |
-| Step 6 - Complete | ∞ | TASK-001, TASK-002, TASK-003 |
+| Step 6 - Complete | ∞ | TASK-001, TASK-002, TASK-003, TASK-004 |
 
 ---
 
@@ -98,21 +98,26 @@
 - **Record:** `.ai/tasks/items/TASK-003-sdk-ui-components.md`
 
 ### TASK-004: API Foundation (Hono + Cloudflare Worker)
-- **Status:** To Be Started
+- **Status:** Complete
 - **Priority:** High
 - **Owner:** NB-Backend-Specialist
 - **Type:** Feature Development
 - **Created:** 2026-06-16
+- **Completed:** 2026-06-16
 - **Dependencies:** TASK-001
 - **Scope:** Set up Hono API with Cloudflare Workers runtime and Wrangler config
 - **Deliverables:**
-  - ✅ `packages/api/` with Hono app
-  - ✅ `wrangler.toml` configuration
-  - ✅ TypeScript + shared-types integration
-  - ✅ Health check endpoint (`GET /health`)
-  - ✅ Local dev environment via `wrangler dev`
-  - ✅ CORS middleware configured
-  - ✅ Error handling middleware
+  - ✅ `packages/api/` with Hono app (enhanced with middleware)
+  - ✅ `wrangler.toml` configuration (dev + prod environments)
+  - ✅ TypeScript + shared-types integration (typecheck passes)
+  - ✅ Health check endpoint (`GET /health`) with metadata
+  - ✅ API info endpoint (`GET /`) with endpoint documentation
+  - ✅ Local dev environment via `wrangler dev` (port 8787)
+  - ✅ CORS middleware configured (permissive for development)
+  - ✅ Request logging middleware
+  - ✅ Global error handling middleware
+  - ✅ 404 handler for undefined routes
+  - ✅ Comprehensive Cloudflare setup documentation (CLOUDFLARE_SETUP.md)
 - **Record:** `.ai/tasks/items/TASK-004-api-foundation.md`
 
 ### TASK-005: API Authentication & Rate Limiting
