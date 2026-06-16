@@ -1,0 +1,25 @@
+{
+  "name": "@nb-feedback-kit/api",
+  "version": "0.0.1",
+  "description": "Cloudflare Workers API for NB Feedback Kit",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "echo 'API uses Wrangler for builds'",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@nb-feedback-kit/shared-types": "workspace:*",
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.16",
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.101.0"
+  }
+}

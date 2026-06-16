@@ -1,0 +1,33 @@
+{
+  "name": "nb-feedback-kit",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reusable feedback, roadmap, and release management system for React applications",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nealbresler/nb-feedback-kit.git"
+  },
+  "license": "MIT",
+  "author": "Neal Bresler",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
