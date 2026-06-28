@@ -1,26 +1,52 @@
 name = "nb-feedback-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-27"
+compatibility_flags = ["nodejs_compat"]
+
+# KV Namespace for API key storage
+[[kv_namespaces]]
+binding = "API_KEYS"
+id = "api-keys-dev"
+preview_id = "api-keys-dev-preview"
+
+# Durable Object for per-key rate limiting
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]
 
 # Development environment
 [env.development]
 name = "nb-feedback-api-dev"
+[[env.development.kv_namespaces]]
+binding = "API_KEYS"
+id = "api-keys-dev"
+preview_id = "api-keys-dev-preview"
+[[env.development.durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+[[env.development.migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]
 
 # Production environment  
 [env.production]
 name = "nb-feedback-api-prod"
+[[env.production.kv_namespaces]]
+binding = "API_KEYS"
+id = "api-keys-prod"
+preview_id = "api-keys-prod-preview"
+[[env.production.durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+[[env.production.migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]
 
-# Note: The following resources will be needed in future tasks:
-# - KV Namespace for API key storage (TASK-005)
-# - Durable Objects for rate limiting (TASK-005)
-# - Secrets for GitHub PAT (TASK-006)
-# 
-# Example configuration (to be added later):
-# [[kv_namespaces]]
-# binding = "API_KEYS"
-# id = "your-kv-namespace-id"
-#
-# [durable_objects]
-# bindings = [
-#   { name = "RATE_LIMITER", class_name = "RateLimiter" }
-# ]
+# GitHub PAT stored as Cloudflare Worker secret (set via wrangler secret put)
+# Required for TASK-006: GitHub Integration Layer
+# [secrets]
+# GITHUB_TOKEN = "<set-via-wrangler-secret-put>"
