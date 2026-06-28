@@ -3,56 +3,54 @@ import {
   FeedbackProvider,
   useFeedback,
   useSubmitFeedback,
+  useReleaseNotes,
+  useRoadmap,
   FeedbackButton,
   FeedbackModal,
+  ReleaseNotesModal,
+  RoadmapModal,
 } from '@nb-feedback-kit/react-sdk';
+import { useRouter } from './hooks/useRouter';
+import { Nav } from './components/Nav';
+import { HomePage } from './pages/HomePage';
+import { FeaturesPage } from './pages/FeaturesPage';
+import { AboutPage } from './pages/AboutPage';
 
 function DemoContent() {
   const { config, metadata } = useFeedback();
   const { submitFeedback } = useSubmitFeedback();
+  const { releases, loading: releasesLoading, error: releasesError } = useReleaseNotes();
+  const { roadmap, loading: roadmapLoading, error: roadmapError } = useRoadmap();
+  const { path, navigate } = useRouter();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
+  const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+
+  const renderPage = () => {
+    switch (path) {
+      case '/features':
+        return <FeaturesPage />;
+      case '/about':
+        return <AboutPage />;
+      case '/':
+      default:
+        return (
+          <HomePage
+            onOpenFeedback={() => setIsModalOpen(true)}
+            onOpenReleaseNotes={() => setIsReleaseNotesOpen(true)}
+            onOpenRoadmap={() => setIsRoadmapOpen(true)}
+          />
+        );
+    }
+  };
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '36px', marginBottom: '8px' }}>NB Feedback Kit</h1>
-      <p style={{ color: '#22c55e', fontWeight: 'bold', fontSize: '18px' }}>✓ SDK successfully integrated!</p>
+      <Nav currentPath={path} onNavigate={navigate} />
 
-      <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #3b82f6' }}>
-        <h2 style={{ marginTop: 0, color: '#1e40af' }}>🎉 Try the Feedback System</h2>
-        <p style={{ lineHeight: '1.6' }}>
-          Click the floating <strong>"Feedback"</strong> button in the bottom-right corner, or use the button below to
-          open the feedback modal. The form includes validation, accessibility features, and simulates submission.
-        </p>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          style={{
-            marginTop: '12px',
-            padding: '12px 24px',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '16px',
-            cursor: 'pointer',
-            fontWeight: '600',
-          }}
-        >
-          Open Feedback Modal
-        </button>
-      </div>
-
-      <div style={{ marginTop: '2rem' }}>
-        <h2 style={{ fontSize: '24px' }}>✨ Features Implemented</h2>
-        <ul style={{ lineHeight: '2', fontSize: '16px' }}>
-          <li>🎯 <strong>Automatic Metadata Capture</strong> - Browser, OS, route, screen size, timestamp</li>
-          <li>🎨 <strong>Headless UI Components</strong> - FeedbackButton & FeedbackModal (fully customizable)</li>
-          <li>✅ <strong>Form Validation</strong> - Real-time validation with error messages</li>
-          <li>♿ <strong>Accessibility</strong> - ARIA labels, keyboard nav, ESC to close, focus trap</li>
-          <li>🔄 <strong>Loading States</strong> - Proper submission feedback with disabled states</li>
-          <li>📱 <strong>Responsive</strong> - Works on all screen sizes</li>
-        </ul>
-      </div>
+      {renderPage()}
 
       <div style={{ marginTop: '2rem' }}>
         <button
@@ -74,14 +72,30 @@ function DemoContent() {
           <>
             <div style={{ marginTop: '1rem' }}>
               <h3>📊 Captured Metadata</h3>
-              <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px', overflow: 'auto', fontSize: '14px' }}>
+              <pre
+                style={{
+                  background: '#f5f5f5',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  overflow: 'auto',
+                  fontSize: '14px',
+                }}
+              >
                 {JSON.stringify(metadata, null, 2)}
               </pre>
             </div>
 
             <div style={{ marginTop: '1rem' }}>
               <h3>⚙️ SDK Configuration</h3>
-              <pre style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px', overflow: 'auto', fontSize: '14px' }}>
+              <pre
+                style={{
+                  background: '#f5f5f5',
+                  padding: '1rem',
+                  borderRadius: '8px',
+                  overflow: 'auto',
+                  fontSize: '14px',
+                }}
+              >
                 {JSON.stringify(config, null, 2)}
               </pre>
             </div>
@@ -115,9 +129,28 @@ function DemoContent() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={async (formData) => {
           const result = await submitFeedback(formData);
+          // Only reached on success — failures throw and are surfaced inline by the modal.
           console.log('✅ Feedback submitted successfully:', result);
           alert(`Feedback submitted! Check console for details.\nIssue URL: ${result.issueUrl}`);
         }}
+      />
+
+      {/* Release Notes Modal */}
+      <ReleaseNotesModal
+        isOpen={isReleaseNotesOpen}
+        onClose={() => setIsReleaseNotesOpen(false)}
+        releases={releases}
+        loading={releasesLoading}
+        error={releasesError}
+      />
+
+      {/* Roadmap Modal */}
+      <RoadmapModal
+        isOpen={isRoadmapOpen}
+        onClose={() => setIsRoadmapOpen(false)}
+        roadmap={roadmap}
+        loading={roadmapLoading}
+        error={roadmapError}
       />
     </div>
   );

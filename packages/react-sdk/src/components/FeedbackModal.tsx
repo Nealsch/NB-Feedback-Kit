@@ -27,6 +27,7 @@ export function FeedbackModal({
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<{ title?: string; description?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const modalRef = useRef<HTMLDivElement>(null);
   const firstFocusableRef = useRef<HTMLButtonElement>(null);
@@ -90,6 +91,7 @@ export function FeedbackModal({
     }
 
     setIsSubmitting(true);
+    setSubmitError(null); // clear previous error on retry
     try {
       await onSubmit({
         type,
@@ -104,7 +106,10 @@ export function FeedbackModal({
       setErrors({});
       onClose();
     } catch (error) {
-      console.error('Failed to submit feedback:', error);
+      const message = error instanceof Error ? error.message : 'Failed to submit feedback';
+      console.error('Failed to submit feedback:', message);
+      // Surface inline error so user can see what went wrong and retry
+      setSubmitError(message);
       // Keep modal open on error so user can retry
     } finally {
       setIsSubmitting(false);
@@ -279,6 +284,24 @@ export function FeedbackModal({
               </div>
             )}
           </div>
+
+          {/* Submission Error Banner */}
+          {submitError && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: '16px',
+                padding: '12px',
+                backgroundColor: '#fef2f2',
+                border: '1px solid #ef4444',
+                borderRadius: '4px',
+                color: '#991b1b',
+                fontSize: '14px',
+              }}
+            >
+              <strong>⚠️ Submission failed:</strong> {submitError}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>

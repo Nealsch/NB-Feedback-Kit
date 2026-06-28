@@ -23,6 +23,7 @@ export interface FeedbackPayload {
 export interface FeedbackResponse {
   success: boolean;
   issueUrl?: string;
+  issueNumber?: number;
   error?: string;
 }
 
@@ -30,6 +31,8 @@ export interface ReleaseNote {
   version: string;
   date: string;
   body: string;
+  /** Optional link to the GitHub release page. Omitted on older API responses. */
+  url?: string;
 }
 
 export interface RoadmapItem {

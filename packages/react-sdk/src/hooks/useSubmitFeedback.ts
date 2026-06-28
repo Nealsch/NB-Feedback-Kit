@@ -3,6 +3,17 @@ import { FeedbackContext } from '../FeedbackProvider';
 import type { FeedbackFormData } from '../components/FeedbackModal';
 import type { FeedbackPayload, FeedbackResponse } from '@nb-feedback-kit/shared-types';
 
+/**
+ * Error thrown when feedback submission fails (network error or non-2xx API response).
+ * Callers (e.g. FeedbackModal) can catch this to surface inline error messages.
+ */
+export class FeedbackSubmitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FeedbackSubmitError';
+  }
+}
+
 export function useSubmitFeedback() {
   const context = useContext(FeedbackContext);
 
@@ -21,21 +32,47 @@ export function useSubmitFeedback() {
         metadata,
       };
 
-      // For now, just log to console
-      // In TASK-008, we'll wire this to the actual API
-      console.log('📤 Submitting feedback:', payload);
-      console.log('🔑 API Config:', {
-        endpoint: config.apiEndpoint,
-        apiKey: config.apiKey.substring(0, 8) + '...',
-      });
+      console.log('📤 Submitting feedback to:', config.apiEndpoint + '/api/feedback');
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      let response: Response;
+      try {
+        response = await fetch(`${config.apiEndpoint}/api/feedback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': config.apiKey,
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch (err) {
+        // Transient network error (fetch threw before a response was received)
+        const message = err instanceof Error ? err.message : 'Network request failed';
+        console.error('❌ Network error submitting feedback:', message);
+        throw new FeedbackSubmitError(
+          'Unable to reach the feedback service. Please check your connection and try again.'
+        );
+      }
 
-      return {
-        success: true,
-        issueUrl: 'https://github.com/example/repo/issues/1',
-      };
+      // Parse JSON body (guard against empty/non-JSON responses)
+      let result: FeedbackResponse;
+      try {
+        result = (await response.json()) as FeedbackResponse;
+      } catch {
+        console.error('❌ Non-JSON response from API. Status:', response.status);
+        throw new FeedbackSubmitError(
+          `The feedback service returned an unexpected response (status ${response.status}).`
+        );
+      }
+
+      // Surface API failures as thrown errors so the UI (FeedbackModal) can react.
+      if (!response.ok || !result.success) {
+        const message = result.error || `API responded with status ${response.status}`;
+        console.error('❌ Feedback submission rejected:', message);
+        throw new FeedbackSubmitError(message);
+      }
+
+      console.log('✅ Feedback submitted successfully:', result);
+      return result;
     },
     [config, metadata]
   );

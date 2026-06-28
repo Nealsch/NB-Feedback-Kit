@@ -55,31 +55,29 @@ This deploys the Worker as `nb-feedback-api-prod`.
 
 ---
 
-## Current State (TASK-004)
+## Current State (MVP Complete)
 
-✅ **What's Working:**
+✅ **Implemented:**
 - Hono.js app with CORS configured
 - Health check endpoint (`/health`)
 - API info endpoint (`/`)
 - Request logging
 - Global error handling
 - 404 handling
-
-🚫 **Not Yet Implemented:**
 - API key authentication (TASK-005)
-- Rate limiting (TASK-005)
-- GitHub integration (TASK-006)
-- Feedback submission endpoint (TASK-006)
-- Release notes endpoint (TASK-009)
-- Roadmap endpoint (TASK-011)
+- Per-key rate limiting via Durable Objects (TASK-005)
+- GitHub integration — issue creation, releases, roadmap (TASK-006)
+- Feedback submission endpoint `POST /api/feedback` (TASK-006)
+- Release notes endpoint `GET /api/releases` (TASK-009)
+- Roadmap endpoint `GET /api/roadmap` (TASK-011)
 
 ---
 
-## Future Setup Requirements
+## Required Setup Steps
 
-The following Cloudflare resources will be needed in upcoming tasks:
+The following Cloudflare resources are required for the API to function:
 
-### TASK-005: API Authentication & Rate Limiting
+### API Authentication & Rate Limiting
 
 #### 1. Create KV Namespace for API Keys
 
@@ -129,7 +127,7 @@ No additional Cloudflare dashboard configuration needed - Durable Objects are en
 
 ---
 
-### TASK-006: GitHub Integration
+### GitHub Integration
 
 #### 1. Create GitHub Personal Access Token (PAT)
 
@@ -285,11 +283,9 @@ pnpm wrangler tail --env development --status error
 
 ## Next Steps
 
-1. ✅ **TASK-004 Complete** - API foundation with Hono + health checks
-2. ⏳ **TASK-005** - Set up KV namespace, add authentication, implement rate limiting
-3. ⏳ **TASK-006** - Add GitHub PAT secret, create feedback endpoint
-4. ⏳ **TASK-009** - Implement `/releases` endpoint
-5. ⏳ **TASK-011** - Implement `/roadmap` endpoint
+1. ✅ **All MVP tasks complete** (TASK-001 through TASK-013)
+2. ⏳ **Pre-production:** Set `GITHUB_TOKEN` secret, populate `API_KEYS` KV, restrict CORS
+3. ⏳ **Deploy:** `pnpm wrangler deploy --env production`
 
 ---
 

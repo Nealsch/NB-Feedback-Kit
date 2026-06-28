@@ -1,0 +1,249 @@
+# API Reference — NB Feedback Kit
+
+## Overview
+
+REST API for NB Feedback Kit, hosted as a Cloudflare Worker (Hono.js). Three authenticated endpoints power feedback collection, release notes, and roadmap display. All authenticated requests require an `X-API-Key` header that maps server-side to a GitHub repository.
+
+**Base URL (production):** `https://nb-feedback-api-prod.<your-subdomain>.workers.dev`
+**Base URL (development):** `https://nb-feedback-api-dev.<your-subdomain>.workers.dev`
+
+---
+
+## Authentication
+
+All `/api/*` endpoints require an API key sent in the `X-API-Key` header.
+
+```
+X-API-Key: your-api-key
+```
+
+API keys are stored in Cloudflare KV (`API_KEYS` namespace) and map to a repository configuration:
+
+```json
+{
+  "name": "My App",
+  "github": { "owner": "my-org", "repo": "my-repo" },
+  "rateLimit": 30
+}
+```
+
+- The client **never** specifies the target repository — it is resolved from the API key (ADR-005).
+- Each API key is rate-limited independently by a Durable Object (60-second sliding window).
+- Invalid or missing keys return `401`. Rate-limit breaches return `429`.
+
+### Rate Limit Headers
+
+Every authenticated response includes:
+
+| Header                  | Description                              |
+| ----------------------- | ---------------------------------------- |
+| `X-RateLimit-Limit`     | Max requests allowed per 60s window.     |
+| `X-RateLimit-Remaining` | Remaining requests in the current window.|
+
+On `429` responses, `Retry-After` (seconds) is also included.
+
+---
+
+## Endpoints
+
+### Health & Info (Public)
+
+#### `GET /`
+
+Returns API metadata and an endpoint directory.
+
+**Response `200`:**
+```json
+{
+  "name": "NB Feedback Kit API",
+  "version": "0.0.1",
+  "endpoints": {
+    "health": "GET /health",
+    "feedback": "POST /api/feedback",
+    "releases": "GET /api/releases",
+    "roadmap": "GET /api/roadmap"
+  },
+  "documentation": "https://github.com/your-org/nb-feedback-kit"
+}
+```
+
+#### `GET /health`
+
+Returns service health with a timestamp.
+
+**Response `200`:**
+```json
+{
+  "status": "ok",
+  "service": "nb-feedback-api",
+  "version": "0.0.1",
+  "timestamp": "2026-06-28T14:23:00.000Z"
+}
+```
+
+---
+
+### Feedback
+
+#### `POST /api/feedback`
+
+Creates a GitHub Issue from user feedback. Issues are auto-labeled based on type (ADR-006):
+- `bug` → labels `["bug", "beta-feedback"]`
+- `feature` → labels `["feature-request", "beta-feedback"]`
+- `feedback` → labels `["feedback", "beta-feedback"]`
+
+**Request body (`FeedbackPayload`):**
+```json
+{
+  "type": "bug",
+  "title": "Login button does nothing",
+  "description": "Clicking login on /auth has no effect in Safari 17.",
+  "metadata": {
+    "application": "My App",
+    "version": "1.0.0",
+    "route": "/auth",
+    "browser": "Safari 17",
+    "os": "macOS",
+    "screenResolution": "1920x1080",
+    "timestamp": "2026-06-28T14:23:00.000Z",
+    "userId": "user-123"
+  }
+}
+```
+
+**Validation rules:**
+- `type` must be one of `bug`, `feature`, `feedback`
+- `title` minimum 3 characters
+- `description` minimum 10 characters
+- `metadata` is required (auto-populated by the SDK)
+
+**Success response `201` (`FeedbackResponse`):**
+```json
+{
+  "success": true,
+  "issueUrl": "https://github.com/my-org/my-repo/issues/42",
+  "issueNumber": 42,
+  "timestamp": "2026-06-28T14:23:00.000Z"
+}
+```
+
+**Error responses:**
+
+| Status | When                                                    |
+| ------ | ------------------------------------------------------- |
+| `400`  | Missing required fields, invalid type, or short content |
+| `401`  | Missing or invalid `X-API-Key`                          |
+| `429`  | Rate limit exceeded                                     |
+| `500`  | `GITHUB_TOKEN` not configured on the server             |
+| `502`  | GitHub API call failed (bad credentials, repo not found)|
+
+---
+
+### Release Notes
+
+#### `GET /api/releases`
+
+Fetches the latest 10 GitHub Releases for the repo mapped to the API key.
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "releases": [
+    {
+      "version": "v1.2.0",
+      "date": "2026-06-20T10:00:00Z",
+      "body": "## What's New\n\n- Added dark mode\n- Fixed login bug",
+      "url": "https://github.com/my-org/my-repo/releases/tag/v1.2.0"
+    }
+  ],
+  "timestamp": "2026-06-28T14:23:00.000Z"
+}
+```
+
+**Error responses:** `401`, `429`, `500` (token missing), `502` (GitHub failure).
+
+---
+
+### Roadmap
+
+#### `GET /api/roadmap`
+
+Fetches GitHub Issues labeled `planned`, `in-progress`, or `released`. Status is derived from labels.
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "roadmap": [
+    {
+      "id": 15,
+      "title": "Dark mode",
+      "status": "released",
+      "url": "https://github.com/my-org/my-repo/issues/15"
+    },
+    {
+      "id": 23,
+      "title": "Export to CSV",
+      "status": "in-progress",
+      "url": "https://github.com/my-org/my-repo/issues/23"
+    }
+  ],
+  "timestamp": "2026-06-28T14:23:00.000Z"
+}
+```
+
+**Error responses:** `401`, `429`, `500` (token missing), `502` (GitHub failure).
+
+---
+
+## Error Response Shape
+
+All errors return a consistent JSON structure:
+
+```json
+{
+  "success": false,
+  "error": "Human-readable message",
+  "timestamp": "2026-06-28T14:23:00.000Z"
+}
+```
+
+Rate-limit (`429`) responses additionally include:
+
+```json
+{
+  "retryAfter": "60",
+  "resetAt": "2026-06-28T14:24:00.000Z"
+}
+```
+
+GitHub-failure (`502`) responses additionally include a `details` field with the underlying GitHub error message (server-side only context).
+
+---
+
+## Versioning
+
+- Current API version: `0.0.1` (returned in health/info responses).
+- No URL prefix versioning yet. Future breaking changes will introduce a `/v1` prefix following semantic versioning.
+
+---
+
+## CORS
+
+| Setting              | Value (development)                            |
+| -------------------- | ---------------------------------------------- |
+| `Access-Control-Allow-Origin` | `*` (restrict in production)          |
+| Allowed methods      | `GET`, `POST`, `OPTIONS`                       |
+| Allowed headers      | `Content-Type`, `Authorization`, `X-API-Key`   |
+| Exposed headers      | `X-RateLimit-Limit`, `X-RateLimit-Remaining`   |
+
+**Production action item:** Restrict `origin` to known application domains before going live.
+
+---
+
+## Change Log
+
+| Date       | Change                                                              | Author              |
+| ---------- | ------------------------------------------------------------------- | ------------------- |
+| 2026-06-28 | Initial API reference populated for MVP (TASK-004–006, 009, 011)   | NB-Backend-Specialist |
