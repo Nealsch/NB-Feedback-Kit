@@ -13,11 +13,32 @@ export interface FeedbackMetadata {
   userId?: string;
 }
 
+/**
+ * Metadata describing a file that has been uploaded to a storage provider.
+ * Used for screenshot attachments embedded into the created issue.
+ */
+export interface UploadedFile {
+  /** Public (or signed) URL the issue provider can render. */
+  url: string;
+  /** Original filename of the uploaded file. */
+  filename: string;
+  /** MIME type, e.g. `image/png`. */
+  contentType: string;
+  /** File size in bytes. */
+  size: number;
+}
+
 export interface FeedbackPayload {
   type: FeedbackType;
   title: string;
   description: string;
   metadata: FeedbackMetadata;
+  /**
+   * Screenshots uploaded via the configured storage provider.
+   * Rendered as Markdown images in the issue body. Optional for backward
+   * compatibility — omit when screenshot uploads are disabled or unavailable.
+   */
+  attachments?: UploadedFile[];
 }
 
 export interface FeedbackResponse {

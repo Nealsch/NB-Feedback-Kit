@@ -46,20 +46,61 @@ function buildIssueTitle(type: string, title: string): string {
 }
 
 /**
- * Creates the issue body with metadata
+ * Escape HTML special characters in user-supplied values (alt text, URL)
+ * before interpolating them into an `<img>` tag in the issue body. This
+ * prevents attribute/HTML injection from a malicious filename or a tampered
+ * storage-provider response.
+ *
+ * The ampersand entity is built from its character code so that no literal
+ * HTML entities appear in source — this keeps source formatters/previewers
+ * from decoding them and silently breaking the escaper.
  */
-function buildIssueBody(payload: FeedbackPayload): string {
+const AMP = String.fromCharCode(38); // "&"
+function escapeHtml(value: string): string {
+  return value.replace(/[&"'<>]/g, (ch) => {
+    if (ch === AMP) return AMP + 'amp;';
+    if (ch === '"') return AMP + 'quot;';
+    if (ch === "'") return AMP + '#39;';
+    if (ch === '<') return AMP + 'lt;';
+    if (ch === '>') return AMP + 'gt;';
+    return ch;
+  });
+}
+
+/**
+ * Creates the issue body with metadata and optional screenshot attachments.
+ * Exported for unit testing of the screenshot-rendering behavior.
+ */
+export function buildIssueBody(payload: FeedbackPayload): string {
   const { description, metadata, type } = payload;
 
-  const sections = [
-    `## Description\n\n${description}`,
+  const sections: string[] = [`## Description\n\n${description}`];
+
+  // Screenshot attachments, rendered as inline images. GitHub renders these
+  // in the issue body. The section is only emitted when attachments are
+  // present, so submissions without images produce a body byte-identical to
+  // the pre-screenshot implementation.
+  if (payload.attachments && payload.attachments.length > 0) {
+    const images = payload.attachments
+      .map((file) => {
+        // Non-empty alt text required; fall back to a generic label.
+        const alt = escapeHtml(file.filename || 'screenshot');
+        const url = escapeHtml(file.url);
+        // HTML <img> wrapper constrains width on large screenshots.
+        return `<img src="${url}" alt="${alt}" width="600" />`;
+      })
+      .join('\n\n');
+    sections.push(`## Screenshots\n\n${images}`);
+  }
+
+  sections.push(
     '---',
     '## Metadata',
     '',
     `**Type:** ${type}`,
     `**Application:** ${metadata.application}`,
-    `**Version:** ${metadata.version}`,
-  ];
+    `**Version:** ${metadata.version}`
+  );
 
   if (metadata.route) sections.push(`**Route:** ${metadata.route}`);
   if (metadata.browser) sections.push(`**Browser:** ${metadata.browser}`);
@@ -94,7 +135,7 @@ async function githubFetch(
     'Authorization': `Bearer ${token}`,
     'Accept': 'application/vnd.github+json',
     'User-Agent': 'nb-feedback-kit',
-    ...(options.headers as Record<string, string> || {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
 
   const response = await fetch(url, {
@@ -120,14 +161,10 @@ export async function createGitHubIssue(
   const body = buildIssueBody(payload);
   const labels = resolveLabels(payload.type);
 
-  const response = await githubFetch(
-    token,
-    `/repos/${repo.owner}/${repo.repo}/issues`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ title, body, labels }),
-    }
-  );
+  const response = await githubFetch(token, `/repos/${repo.owner}/${repo.repo}/issues`, {
+    method: 'POST',
+    body: JSON.stringify({ title, body, labels }),
+  });
 
   if (!response.ok) {
     const errorBody = await response.text();

@@ -1,7 +1,9 @@
-import React, { createContext, ReactNode, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useEffect, useMemo, useState } from 'react';
 import type { FeedbackConfig, FeedbackContextValue } from './types';
 import { captureMetadata } from './utils/metadata';
 import type { FeedbackMetadata } from '@nb-feedback-kit/shared-types';
+import { createStorageProvider } from './storage';
+import type { StorageProvider } from './storage/types';
 
 export const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
@@ -12,6 +14,13 @@ interface FeedbackProviderProps {
 
 export function FeedbackProvider({ config, children }: FeedbackProviderProps) {
   const [metadata, setMetadata] = useState<FeedbackMetadata | null>(null);
+
+  // Build the storage provider from config once. Recreated only if the
+  // caller's storage config identity changes. Default = disabled (none).
+  const storage: StorageProvider = useMemo(
+    () => createStorageProvider(config.storage ?? { type: 'none' }),
+    [config.storage]
+  );
 
   useEffect(() => {
     // Capture metadata on mount
@@ -31,6 +40,7 @@ export function FeedbackProvider({ config, children }: FeedbackProviderProps) {
   const contextValue: FeedbackContextValue = {
     config,
     metadata,
+    storage,
   };
 
   return (

@@ -3,48 +3,57 @@ main = "src/index.ts"
 compatibility_date = "2024-11-27"
 compatibility_flags = ["nodejs_compat"]
 
-# KV Namespace for API key storage
-[[kv_namespaces]]
-binding = "API_KEYS"
-id = "api-keys-dev"
-preview_id = "api-keys-dev-preview"
-
-# Durable Object for per-key rate limiting
+# Durable Object for per-key rate limiting (top-level default; env-specific
+# blocks below override for development/production).
 [[durable_objects.bindings]]
 name = "RATE_LIMITER"
 class_name = "RateLimiter"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["RateLimiter"]
+# Free plan requires SQLite-backed Durable Objects (new_sqlite_classes),
+# not legacy in-memory (new_classes). Cloudflare error 10097 otherwise.
+new_sqlite_classes = ["RateLimiter"]
 
-# Development environment
+# Development environment (used by `wrangler deploy --env development`)
 [env.development]
 name = "nb-feedback-api-dev"
+
+# KV Namespace for API key storage.
+# id is the real namespace UUID returned by `wrangler kv namespace list`
+# (title: development-API_KEYS). Earlier placeholder "api-keys-dev" caused
+# Cloudflare error 10042 on deploy.
 [[env.development.kv_namespaces]]
 binding = "API_KEYS"
-id = "api-keys-dev"
-preview_id = "api-keys-dev-preview"
+id = "b048526f0fe6404e8b25104e193aa35c"
+preview_id = "b048526f0fe6404e8b25104e193aa35c"
+
 [[env.development.durable_objects.bindings]]
 name = "RATE_LIMITER"
 class_name = "RateLimiter"
+
 [[env.development.migrations]]
 tag = "v1"
-new_classes = ["RateLimiter"]
+new_sqlite_classes = ["RateLimiter"]
 
-# Production environment  
+# Production environment (not yet provisioned — run `wrangler kv namespace
+# create API_KEYS --env production` and paste the returned id below before
+# deploying to prod).
 [env.production]
 name = "nb-feedback-api-prod"
+
 [[env.production.kv_namespaces]]
 binding = "API_KEYS"
-id = "api-keys-prod"
-preview_id = "api-keys-prod-preview"
+id = "REPLACE_WITH_PROD_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_PROD_NAMESPACE_ID"
+
 [[env.production.durable_objects.bindings]]
 name = "RATE_LIMITER"
 class_name = "RateLimiter"
+
 [[env.production.migrations]]
 tag = "v1"
-new_classes = ["RateLimiter"]
+new_sqlite_classes = ["RateLimiter"]
 
 # GitHub PAT stored as Cloudflare Worker secret (set via wrangler secret put)
 # Required for TASK-006: GitHub Integration Layer

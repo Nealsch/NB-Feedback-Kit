@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState, FormEvent } from 'react';
-import type { FeedbackType } from '@nb-feedback-kit/shared-types';
+import type { FeedbackType, UploadedFile } from '@nb-feedback-kit/shared-types';
+import type { StorageProvider } from '../storage/types';
 
 export interface FeedbackFormData {
   type: FeedbackType;
   title: string;
   description: string;
+  /**
+   * Successfully uploaded screenshots to embed in the issue. Absent when the
+   * storage provider is disabled. May be shorter than the number of files
+   * the user picked if some uploads failed (see `uploadErrors`).
+   */
+  attachments?: UploadedFile[];
 }
 
 export interface FeedbackModalProps {
@@ -13,6 +20,26 @@ export interface FeedbackModalProps {
   onSubmit: (data: FeedbackFormData) => void | Promise<void>;
   className?: string;
   style?: React.CSSProperties;
+  /**
+   * Storage provider used to upload screenshots. When omitted or when
+   * `provider.enabled === false`, the screenshot picker is hidden entirely.
+   * Typically sourced from `useFeedback().storage`.
+   */
+  storageProvider?: StorageProvider;
+}
+
+/**
+ * Per-file state for the screenshot picker.
+ * `uploading` files are in-flight; `uploaded` files succeeded; `error`
+ * files failed (kept visible so the user can retry by removing + re-adding).
+ */
+interface AttachmentState {
+  id: string;
+  file: File;
+  previewUrl: string;
+  status: 'uploading' | 'uploaded' | 'error';
+  uploaded?: UploadedFile;
+  error?: string;
 }
 
 export function FeedbackModal({
@@ -21,6 +48,7 @@ export function FeedbackModal({
   onSubmit,
   className = '',
   style,
+  storageProvider,
 }: FeedbackModalProps) {
   const [type, setType] = useState<FeedbackType>('feedback');
   const [title, setTitle] = useState('');
@@ -29,8 +57,15 @@ export function FeedbackModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // Screenshot attachments. Only used when storageProvider?.enabled === true.
+  const [attachments, setAttachments] = useState<AttachmentState[]>([]);
+
   const modalRef = useRef<HTMLDivElement>(null);
   const firstFocusableRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Screenshots are shown only when a provider is enabled.
+  const screenshotsEnabled = !!storageProvider?.enabled;
 
   // Focus trap on open
   useEffect(() => {
@@ -83,6 +118,58 @@ export function FeedbackModal({
     return Object.keys(newErrors).length === 0;
   };
 
+  /**
+   * Handle one or more files chosen from the photo album. Adds them to state
+   * and kicks off uploads immediately; per-file failures are recorded and
+   * do not block form submission.
+   */
+  const handleFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0 || !storageProvider) return;
+
+    const newEntries: AttachmentState[] = Array.from(files)
+      .filter((f) => f.type.startsWith('image/'))
+      .map((file) => ({
+        id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: 'uploading' as const,
+      }));
+
+    if (newEntries.length === 0) return;
+    setAttachments((prev) => [...prev, ...newEntries]);
+
+    // Upload each file independently.
+    newEntries.forEach(async (entry) => {
+      try {
+        const uploaded = await storageProvider.upload(entry.file);
+        setAttachments((prev) =>
+          prev.map((a) => (a.id === entry.id ? { ...a, status: 'uploaded', uploaded } : a))
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Upload failed';
+        console.error(`Screenshot upload failed for ${entry.file.name}:`, message);
+        setAttachments((prev) =>
+          prev.map((a) => (a.id === entry.id ? { ...a, status: 'error', error: message } : a))
+        );
+      }
+    });
+  };
+
+  /** Remove an attachment and revoke its object URL to avoid leaks. */
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => {
+      const target = prev.find((a) => a.id === id);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  /** Successfully uploaded files to forward to onSubmit. */
+  const completedAttachments = (): UploadedFile[] =>
+    attachments.filter((a) => a.status === 'uploaded' && a.uploaded).map((a) => a.uploaded!);
+
+  const hasUploadingAttachments = attachments.some((a) => a.status === 'uploading');
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -93,17 +180,23 @@ export function FeedbackModal({
     setIsSubmitting(true);
     setSubmitError(null); // clear previous error on retry
     try {
+      const attachmentsDone = completedAttachments();
       await onSubmit({
         type,
         title: title.trim(),
         description: description.trim(),
+        // Only include the attachments key when screenshots are enabled, so
+        // disabled-config payloads stay byte-identical to before.
+        ...(screenshotsEnabled ? { attachments: attachmentsDone } : {}),
       });
 
-      // Reset form on success
+      // Reset form on success (including revoking object URLs).
       setType('feedback');
       setTitle('');
       setDescription('');
       setErrors({});
+      attachments.forEach((a) => URL.revokeObjectURL(a.previewUrl));
+      setAttachments([]);
       onClose();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit feedback';
@@ -285,6 +378,128 @@ export function FeedbackModal({
             )}
           </div>
 
+          {/* Screenshot Picker (only when a storage provider is enabled) */}
+          {screenshotsEnabled && (
+            <div style={{ marginBottom: '16px' }}>
+              <label
+                htmlFor="feedback-screenshots"
+                style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}
+              >
+                Screenshots
+              </label>
+
+              {/* Hidden input rendered via a button to invoke the native album/camera picker. */}
+              <input
+                ref={fileInputRef}
+                id="feedback-screenshots"
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  handleFilesSelected(e.target.files);
+                  // Reset so selecting the same file again still fires onChange.
+                  e.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px dashed #9ca3af',
+                  borderRadius: '4px',
+                  backgroundColor: '#f9fafb',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: '#374151',
+                }}
+              >
+                📎 Attach Screenshot
+              </button>
+
+              {/* Preview thumbnails */}
+              {attachments.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                  {attachments.map((a) => (
+                    <div
+                      key={a.id}
+                      style={{
+                        position: 'relative',
+                        width: '72px',
+                        height: '72px',
+                        border: `1px solid ${a.status === 'error' ? '#ef4444' : '#ccc'}`,
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <img
+                        src={a.previewUrl}
+                        alt={a.file.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor:
+                            a.status === 'uploading'
+                              ? 'rgba(255,255,255,0.6)'
+                              : a.status === 'error'
+                                ? 'rgba(239,68,68,0.6)'
+                                : 'transparent',
+                          color: a.status === 'error' ? 'white' : '#374151',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                          padding: '2px',
+                        }}
+                      >
+                        {a.status === 'uploading' ? 'Uploading…' : a.status === 'error' ? 'Failed' : ''}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(a.id)}
+                        aria-label={`Remove ${a.file.name}`}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          width: '18px',
+                          height: '18px',
+                          padding: 0,
+                          border: 'none',
+                          borderRadius: '50%',
+                          backgroundColor: 'rgba(0,0,0,0.6)',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          lineHeight: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Per-upload failure note (graceful: does not block submit). */}
+              {attachments.some((a) => a.status === 'error') && (
+                <div role="note" style={{ color: '#991b1b', fontSize: '12px', marginTop: '6px' }}>
+                  One or more screenshots failed to upload. The feedback will still be submitted
+                  without them. Remove and re-attach to retry.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Submission Error Banner */}
           {submitError && (
             <div
@@ -322,18 +537,22 @@ export function FeedbackModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || hasUploadingAttachments}
               style={{
                 padding: '8px 16px',
                 border: 'none',
                 borderRadius: '4px',
-                backgroundColor: isSubmitting ? '#ccc' : '#3b82f6',
+                backgroundColor: isSubmitting || hasUploadingAttachments ? '#ccc' : '#3b82f6',
                 color: 'white',
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                cursor: isSubmitting || hasUploadingAttachments ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
               }}
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+              {isSubmitting
+                ? 'Submitting...'
+                : hasUploadingAttachments
+                  ? 'Uploading screenshots…'
+                  : 'Submit Feedback'}
             </button>
           </div>
         </form>

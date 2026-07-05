@@ -30,6 +30,12 @@ export function useSubmitFeedback() {
         title: formData.title,
         description: formData.description,
         metadata,
+        // Forward uploaded screenshot URLs when present. Absent entirely
+        // (not even an empty array) when screenshots are disabled or none
+        // uploaded, keeping the payload backward-compatible.
+        ...(formData.attachments && formData.attachments.length > 0
+          ? { attachments: formData.attachments }
+          : {}),
       };
 
       console.log('📤 Submitting feedback to:', config.apiEndpoint + '/api/feedback');
