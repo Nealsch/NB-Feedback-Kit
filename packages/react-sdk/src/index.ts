@@ -21,13 +21,20 @@ export type { RoadmapModalProps } from './components/RoadmapModal';
 export type { UseRoadmapResult } from './hooks/useRoadmap';
 export { captureMetadata, detectBrowser, detectOS, detectRoute, detectScreenResolution } from './utils/metadata';
 
-// Screenshot storage providers (Sprint 1: none + custom endpoint).
+// Screenshot storage providers.
+// - none: default, screenshots disabled
+// - custom: upload to your own HTTP endpoint (Sprint 1)
+// - s3: S3-compatible (AWS S3, Cloudflare R2, MinIO, B2) via Worker-presigned URLs
 export { NoneStorageProvider } from './storage/none-provider';
 export { CustomEndpointProvider } from './storage/custom-endpoint-provider';
+export { S3StorageProvider } from './storage/providers/s3';
+export { createStorageProvider } from './storage';
+export type { StorageHostContext } from './storage';
 export { testStorageProvider } from './storage/test-connection';
 export type {
   StorageProvider,
   StorageProviderConfig,
   CustomEndpointConfig,
+  S3Config,
   StorageTestResult,
 } from './storage/types';

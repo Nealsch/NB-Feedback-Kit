@@ -203,6 +203,73 @@ describe('Feature', () => {
 - Need examples for common styling frameworks (Tailwind, styled-components)
 - Future enhancement
 
+## 2026-07-05: Storage-Provider Agnosticism (S3-compatible presigned URLs)
+
+### What Worked Well
+
+**1. Zero-Dependency SigV4 via Web Crypto API**
+- Implementing SigV4 presigned-URL signing with the Web Crypto API (no npm
+  packages) kept the SDK bundle small and avoided supply-chain surface.
+- The signer is pure + deterministic, making it trivially unit-testable.
+- **Lesson:** For well-documented crypto protocols (SigV4), a small in-repo
+  implementation is preferable to pulling in a heavy SDK.
+
+**2. Extending the Discriminated-Union Pattern**
+- Adding the `s3` branch to `StorageProviderConfig` was a compile-time-safe
+  operation thanks to the existing `never`-guarded exhaustiveness check in
+  `createStorageProvider`.
+- No existing provider code needed to change.
+- **Lesson:** The discriminated-union + exhaustive-switch pattern pays off
+  every time a new variant is added — the compiler tells you exactly what to
+  wire up.
+
+**3. Reusing the Existing Auth + Rate-Limit Pipeline**
+- The presign route sits under `/api/*`, so it inherited `X-API-Key` auth,
+  KV lookup, and the `RateLimiter` Durable Object for free.
+- No parallel auth system was needed.
+- **Lesson:** When a new endpoint fits an existing middleware prefix, prefer
+  mounting it there over building a bespoke path.
+
+### What Caused Friction
+
+**1. No Dedicated Integration Test for the Presign Route Handler**
+- The SigV4 signer has 16 unit tests, but the route handler (auth, allowlist,
+  400/403/500 paths) does not yet have an integration test.
+- **Lesson:** When splitting logic (signer) from orchestration (route),
+  test both layers — don't assume the unit-tested layer covers the handler.
+
+**2. Bucket Public-Readability Requirement**
+- The returned `publicUrl` only renders as a Markdown image in the GitHub
+  issue if the bucket is publicly readable. This is a deployment requirement
+  that is easy to miss.
+- **Lesson:** Document provider-specific deployment prerequisites inline in
+  the config UI, not just in the ADR.
+
+### Patterns That Emerged
+
+**Pattern: Server-Signed, Client-Uploaded**
+- Server signs a short-lived URL → client uploads bytes directly to the
+  storage backend → server never touches the bytes → client never sees the
+  credentials.
+- Applicable to any future storage provider that supports presigned URLs
+  (Azure SAS, GCS signed URLs).
+
+**Pattern: Non-Secret Config in SDK, Secrets in Worker**
+- The SDK config holds only targeting info (bucket, region, endpoint). The
+  Worker holds the credentials. The bucket allowlist defends against forged
+  config.
+- Generalizes to any provider where credentials must be isolated from the
+  client bundle.
+
+### Reusable Insight
+
+**Insight: Browser CORS Is the Operator's Responsibility**
+- The SDK cannot control the bucket's CORS policy. Operators must allow PUT
+  from the app's origin. This should be a setup-guide checklist item for
+  every storage provider that involves direct browser uploads.
+
+---
+
 ## Summary
 
 Session was highly productive. Completed 3 major tasks with comprehensive testing and documentation. Monorepo architecture validated. Security-first approach paid off immediately. Ready for authentication and GitHub integration phase.

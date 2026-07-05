@@ -17,9 +17,15 @@ export function FeedbackProvider({ config, children }: FeedbackProviderProps) {
 
   // Build the storage provider from config once. Recreated only if the
   // caller's storage config identity changes. Default = disabled (none).
+  // The S3 provider needs the Worker base URL + API key to request presigned
+  // upload URLs; pass them as host context. `none`/`custom` providers ignore it.
   const storage: StorageProvider = useMemo(
-    () => createStorageProvider(config.storage ?? { type: 'none' }),
-    [config.storage]
+    () =>
+      createStorageProvider(config.storage ?? { type: 'none' }, {
+        apiEndpoint: config.apiEndpoint,
+        apiKey: config.apiKey,
+      }),
+    [config.storage, config.apiEndpoint, config.apiKey]
   );
 
   useEffect(() => {

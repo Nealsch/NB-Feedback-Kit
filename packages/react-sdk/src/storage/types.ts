@@ -20,7 +20,8 @@ import type { UploadedFile } from '@nb-feedback-kit/shared-types';
  */
 export type StorageProviderConfig =
   | { type: 'none' }
-  | { type: 'custom'; endpoint: CustomEndpointConfig };
+  | { type: 'custom'; endpoint: CustomEndpointConfig }
+  | { type: 's3'; s3: S3Config };
 
 /**
  * Configuration for a user-supplied upload endpoint.
@@ -45,6 +46,32 @@ export interface CustomEndpointConfig {
    * Defaults to `url`.
    */
   responseUrlPath?: string;
+}
+
+/**
+ * Configuration for S3-compatible storage providers.
+ *
+ * This config holds only **non-secret targeting information** — bucket,
+ * region, optional endpoint, and key prefix. The actual cloud credentials
+ * live only as Worker secrets and are used to sign short-lived presigned
+ * PUT URLs. Nothing in this object should be treated as secret.
+ *
+ * Works with AWS S3, Cloudflare R2, MinIO, Backblaze B2 (S3 API), and any
+ * other S3-compatible store via {@link S3Config.endpoint}.
+ */
+export interface S3Config {
+  /** Bucket name. Must be allowlisted in the Worker's `S3_ALLOWED_BUCKETS`. */
+  bucket: string;
+  /** Region (e.g. `us-east-1`). Use `auto` for Cloudflare R2. */
+  region: string;
+  /**
+   * Optional S3-compatible base endpoint (scheme + host, no trailing slash).
+   * Omit for AWS S3 standard. Set for R2 (`https://<account>.r2.cloudflarestorage.com`),
+   * MinIO, or Backblaze B2.
+   */
+  endpoint?: string;
+  /** Optional object-key prefix (folder), e.g. `feedback/`. */
+  keyPrefix?: string;
 }
 
 /**

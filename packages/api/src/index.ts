@@ -6,6 +6,7 @@ import type { FeedbackConfig } from './types';
 import type { FeedbackPayload } from '@nb-feedback-kit/shared-types';
 import type { ApiEnv } from './env';
 import { createGitHubIssue, getReleases, getRoadmap } from './github/client';
+import { handlePresign } from './storage/presign';
 
 // Durable Object entrypoint export.
 // Required by Wrangler whenever a [[durable_objects.bindings]] entry references
@@ -62,6 +63,7 @@ app.get('/', (c) => {
       feedback: 'POST /api/feedback',
       releases: 'GET /api/releases',
       roadmap: 'GET /api/roadmap',
+      presign: 'POST /api/uploads/presign',
     },
     documentation: 'https://github.com/your-org/nb-feedback-kit',
   });
@@ -240,6 +242,18 @@ app.get('/api/roadmap', async (c) => {
     }, 502);
   }
 });
+
+/**
+ * POST /api/uploads/presign
+ * Issues a short-lived, S3-compatible presigned PUT URL so the SDK can
+ * upload screenshots directly to the developer's cloud bucket. Cloud
+ * credentials live only as Worker secrets; the client receives only the
+ * signed URL and the canonical public URL.
+ *
+ * Requires: X-API-Key header (enforced by the `/api/*` auth middleware).
+ * Body: PresignRequest (provider, filename, contentType, bucket, region, …)
+ */
+app.post('/api/uploads/presign', handlePresign);
 
 /** Maximum number of screenshot attachments accepted per submission. */
 const MAX_ATTACHMENTS = 5;

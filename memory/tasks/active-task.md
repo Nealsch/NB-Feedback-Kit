@@ -1,189 +1,116 @@
 # Active Task
 
 ## Current
-**Session Closed** — 2026-06-16, 21:31 PM
+**Session Closed** — 2026-07-05, 22:15 PM
 
-All work for TASK-002, TASK-003, and TASK-004 complete and verified.
+Storage-provider agnosticism implemented and verified — the feedback kit now
+supports S3-compatible providers (AWS S3, Cloudflare R2, MinIO, Backblaze B2)
+alongside the existing `none` and `custom` providers, using Worker-issued
+presigned URLs so cloud credentials never reach the browser.
 
-## Session Summary — 2026-06-16
+## Session Summary — 2026-07-05
 
 ### Objective
-Implement SDK core architecture, UI components, and API foundation for NB Feedback Kit.
+Make the feedback kit storage-provider agnostic so the app developer (client)
+can configure their preferred storage provider (e.g. AWS S3) when releasing to
+beta testers. The configuration must be captured by the kit at build time and
+must be secure — cloud credentials must never ship in the client bundle.
+
+### Decision
+**ADR-008: Storage-Provider Agnosticism via Worker-Issued Presigned URLs.**
+Added a third provider branch (`s3`) to the storage-provider discriminated
+union. The SDK holds only non-secret targeting info (bucket, region, optional
+endpoint, optional key prefix). The Worker signs short-lived SigV4 presigned
+PUT URLs server-side; the SDK uploads bytes directly to the bucket. Zero new
+npm dependencies (SigV4 implemented with the Web Crypto API).
 
 ### Completed Today
 
-**TASK-002: SDK Core Architecture** ✅
-- Created metadata capture utilities (browser, OS, route, screen resolution detection)
-- Implemented FeedbackProvider with auto-capture on mount
-- Updated types to include FeedbackContextValue with metadata
-- Exported metadata utilities from SDK
-- Demo app displays captured metadata
-- Build successful
-
-**TASK-003: SDK UI Components** ✅
-- Created FeedbackButton component (configurable positioning)
-- Created FeedbackModal component with form validation
-- Implemented useSubmitFeedback hook (mock implementation)
-- Real-time validation (min 3 chars title, min 10 chars description)
-- Accessibility features (ARIA labels, keyboard nav, ESC to close, focus trap)
-- Headless architecture (base styling only)
-- Loading states during submission
-- Demo app fully interactive
-
-**TASK-004: API Foundation** ✅
-- Enhanced Hono API with middleware stack (CORS, logging, error handling)
-- Health check endpoint (`GET /health`)
-- API info endpoint (`GET /`)
-- 404 handler with structured responses
-- Wrangler configuration (dev + prod environments)
-- **11 unit tests created and passing** (API routes, CORS, error handling, security headers)
-- **Security audit completed** (B+ rating, zero vulnerabilities)
-- **Wrangler updated** from v3.92.0 to v4.101.0
-- Comprehensive CLOUDFLARE_SETUP.md documentation
-- User verified: Cloudflare setup successful, `pnpm dev` and `pnpm test` working
+**Storage-provider agnosticism (S3-compatible)** ✅
+- **API (Worker):**
+  - `packages/api/src/storage/sigv4.ts` — Zero-dep SigV4 presigned-URL signer (Web Crypto API only).
+  - `packages/api/src/storage/presign.ts` — `POST /api/uploads/presign` route handler (under `/api/*` auth + rate limiting). Enforces bucket allowlist (`S3_ALLOWED_BUCKETS`), length-caps inputs, server-generates object key.
+  - `packages/api/src/storage/sigv4.test.ts` — 16 new tests (URL structure, determinism, signature sensitivity, URI encoding, input validation).
+  - `packages/api/src/env.d.ts` — Added `S3_*` env bindings.
+  - `packages/api/src/index.ts` — Mounted presign route under the authenticated `/api` Hono app.
+- **SDK:**
+  - `packages/react-sdk/src/storage/providers/s3.ts` — `S3StorageProvider` (calls Worker presign → PUT to bucket → returns `UploadedFile`).
+  - `packages/react-sdk/src/storage/types.ts` — Added `S3Config`; extended `StorageProviderConfig` union.
+  - `packages/react-sdk/src/storage/index.ts` — Added `s3` branch to `createStorageProvider` + exported `StorageHostContext`.
+  - `packages/react-sdk/src/storage/test-connection.ts` — Added S3 probe (calls presign, no bytes written).
+  - `packages/react-sdk/src/components/StorageConfigPanel.tsx` — Added S3 config form (bucket, region, endpoint, key prefix) with security guidance.
+  - `packages/react-sdk/src/index.ts` — Exported `S3StorageProvider`, `S3Config`, `createStorageProvider`, `StorageHostContext`.
+- **Shared types:** `PresignRequest` / `PresignResponse` contracts added to `packages/shared-types/src/index.ts`.
+- **Documentation:**
+  - `memory/project-decisions.md` — Added ADR-008 (context, alternatives, consequences, security review).
+  - `resources/api-reference.md` — Documented `POST /api/uploads/presign`.
 
 ### Files Created Today
 ```
-packages/react-sdk/src/utils/metadata.ts
-packages/react-sdk/src/components/FeedbackButton.tsx
-packages/react-sdk/src/components/FeedbackModal.tsx
-packages/react-sdk/src/hooks/useSubmitFeedback.ts
-packages/api/src/index.test.ts
-packages/api/vitest.config.ts
-packages/api/CLOUDFLARE_SETUP.md
-packages/api/SECURITY_AUDIT.md
+packages/api/src/storage/sigv4.ts
+packages/api/src/storage/sigv4.test.ts
+packages/api/src/storage/presign.ts
+packages/react-sdk/src/storage/providers/s3.ts
 ```
 
 ### Files Modified Today
 ```
-packages/react-sdk/src/types.ts
-packages/react-sdk/src/FeedbackProvider.tsx
-packages/react-sdk/src/useFeedback.ts
-packages/react-sdk/src/index.ts
+packages/shared-types/src/index.ts
+packages/api/src/env.d.ts
 packages/api/src/index.ts
-packages/api/wrangler.toml
-packages/api/package.json
-apps/demo-app/src/App.tsx
-memory/tasks/project-board.md
+packages/react-sdk/src/storage/types.ts
+packages/react-sdk/src/storage/index.ts
+packages/react-sdk/src/storage/test-connection.ts
+packages/react-sdk/src/components/StorageConfigPanel.tsx
+packages/react-sdk/src/index.ts
+memory/project-decisions.md
+resources/api-reference.md
 ```
 
 ### Test Results
-- **Unit Tests:** 11/11 passed
-- **Security Audit:** B+ rating
-- **TypeScript Compilation:** ✅ All packages
-- **Build:** ✅ Successful
-- **Local Development:** ✅ Verified by user
+- **Typecheck:** 4/4 packages pass (shared-types, api, react-sdk, demo-app).
+- **Tests:** 46/46 pass (30 existing + 16 new SigV4 tests). No regressions.
+- **New runtime dependencies:** None.
 
 ### Dependency Changes
-**Packages Added:**
-- `vitest@^4.1.9` (dev) - Unit testing framework
-- `@cloudflare/vitest-pool-workers@^0.16.16` (dev) - Cloudflare Workers test pool
-
-**Packages Updated:**
-- `wrangler@^3.92.0` → `^4.101.0` - Major version update for latest Cloudflare Workers features
-
-**Security Observations:**
-- All dependencies scanned - zero vulnerabilities
-- pnpm lockfile up-to-date
-- No phantom dependencies detected
-
-## Recently Completed
-| ID | Priority | Owner | Completed | Summary |
-|----|----------|-------|-----------|---------|
-| TASK-001 | Critical | DevOps | 2026-06-16 | Monorepo infrastructure setup |
-| TASK-002 | High | Frontend | 2026-06-16 | SDK core architecture & metadata capture |
-| TASK-003 | High | Frontend | 2026-06-16 | FeedbackButton & FeedbackModal components |
-| TASK-004 | High | Backend | 2026-06-16 | API foundation + testing + security audit |
-
-## Open Issues for Next Session
-Priority order for next development session:
-
-1. **TASK-005: API Authentication & Rate Limiting** (High Priority)
-   - Implement API key validation middleware
-   - Create Cloudflare KV namespace for API keys
-   - Implement Durable Objects rate limiter
-   - Security review required
-
-2. **TASK-006: GitHub Integration Layer** (High Priority)
-   - GitHub API client module
-   - Issue creation with metadata
-   - Label auto-tagging
-   - POST /feedback endpoint
-
-3. **TASK-008: SDK-to-API Integration** (High Priority)
-   - Wire useSubmitFeedback to live API
-   - Real API calls instead of mock
-   - Error handling
+None. Zero new packages added or updated. SigV4 signing uses the Web Crypto
+API only.
 
 ## Hand-Off Notes
 
-### Current State
-- **4/13 tasks complete** (31% progress)
-- SDK fully functional with mock submission
-- API running locally and tested
-- Demo app at http://localhost:5173
-- API at http://localhost:8787 (when running `pnpm dev`)
+### Security Posture
+- Cloud credentials (`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`) live only as
+  Worker secrets. Never serialized into responses. Never shipped in the SDK
+  bundle.
+- Presign route inherits `/api/*` middleware (`X-API-Key` + KV lookup) and the
+  `RateLimiter` Durable Object — no parallel auth system.
+- Bucket allowlist (`S3_ALLOWED_BUCKETS`) defends against forged SDK config
+  targeting a different bucket.
+- Returned URLs pass through the existing `sanitizeAttachments` `http`/`https`
+  scheme check before GitHub issue-body interpolation (unchanged).
 
-### Known Issues
-None. All tests passing, security audit clean.
+### Known Limitations
+- Bucket must be **publicly readable** for the returned `publicUrl` to render
+  as a Markdown image in the GitHub issue. Documented in ADR-008. Signed GET
+  URLs deferred as a future enhancement.
+- SigV4 signing logic maintained in-repo. Mitigated by the dedicated test
+  suite (`packages/api/src/storage/sigv4.test.ts`).
+- Operators must provision the new `S3_*` Worker secrets before this provider
+  works in a deployed environment.
 
-### Cloudflare Setup Status
-- ✅ Wrangler authenticated
-- ✅ Local development working
-- ✅ Tests passing
-- ❌ KV namespace not created yet (TASK-005)
-- ❌ Durable Objects not configured yet (TASK-005)
-- ❌ GitHub token not added yet (TASK-006)
-
-### Security Notes
-- CORS currently permissive (`origin: '*'`) - acceptable for development
-- Rate limiting not implemented yet (Cloudflare provides basic 100K/day limit)
-- No authentication on current endpoints (health check is intentionally public)
-- See `packages/api/SECURITY_AUDIT.md` for full report
-
-### Next Steps
-1. Create Cloudflare KV namespace for API keys (TASK-005)
-2. Implement authentication middleware (TASK-005)
-3. Build Durable Objects rate limiter (TASK-005)
-4. Add GitHub PAT as Cloudflare secret (TASK-006)
-5. Create feedback submission endpoint (TASK-006)
-
-## Local Dev Commands
-
-### Start All Services
-```bash
-# Terminal 1: Demo app
-cd apps/demo-app
-pnpm dev
-# http://localhost:5173
-
-# Terminal 2: API
-cd packages/api
-pnpm dev
-# http://localhost:8787
-```
-
-### Run Tests
-```bash
-# API tests
-cd packages/api
-pnpm test
-
-# Build all packages
-cd ../..
-pnpm build
-```
-
-### Cloudflare Deployment
-```bash
-cd packages/api
-
-# Deploy to development
-pnpm wrangler deploy --env development
-
-# Deploy to production
-pnpm wrangler deploy --env production
-```
+### Open Items / Next Steps
+1. **Demo app showcase** — `apps/demo-app` does not yet demonstrate the S3
+   provider. Add a toggle in the demo to switch between `none` / `custom` /
+   `s3` so the full flow is manually testable.
+2. **Integration test for presign route** — The SigV4 signer is unit-tested,
+   but the `POST /api/uploads/presign` route handler itself (auth, allowlist,
+   400/403/500 paths) has no dedicated integration test yet.
+3. **SDK provider test** — `S3StorageProvider` has no unit test (fetch mock).
+4. **CORS configuration** — Operators using the S3 provider must configure
+   CORS on their bucket to allow PUT from the app's origin. Document this in
+   a setup guide.
+5. **wrangler.toml** — Confirm whether the new `S3_*` secrets need to be
+   declared in `wrangler.toml` for local dev (they are read via `env`).
 
 ## Last Updated
-2026-06-16, 21:31 PM
+2026-07-05, 22:15 PM

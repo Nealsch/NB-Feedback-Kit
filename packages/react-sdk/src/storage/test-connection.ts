@@ -16,6 +16,8 @@
  */
 
 import type { StorageProviderConfig, StorageTestResult } from './types';
+import type { StorageHostContext } from './index';
+import { S3StorageProvider } from './providers/s3';
 
 /** 67-byte transparent 1×1 PNG. Smallest valid PNG. */
 const PROBE_PNG_BASE64 =
@@ -27,13 +29,18 @@ const PROBE_FILENAME = '__nb-feedback-kit-test__.png';
 /**
  * Run a Test Connection probe against the given storage config.
  *
- * For `{ type: 'none' }` the result is always success (no network call).
- * For `{ type: 'custom' }` a real probe request is sent to the endpoint.
+ * - `{ type: 'none' }` → always success (no network call).
+ * - `{ type: 'custom' }` → sends a real probe upload to the endpoint.
+ * - `{ type: 's3' }` → calls the Worker presign endpoint (no bytes written).
  *
+ * @param config    Storage provider config to probe.
+ * @param hostCtx   Required for `s3` (Worker base URL + API key). Ignored by
+ *                  `none` and `custom`.
  * @returns A {@link StorageTestResult} describing the outcome.
  */
 export async function testStorageProvider(
-  config: StorageProviderConfig
+  config: StorageProviderConfig,
+  hostCtx?: StorageHostContext
 ): Promise<StorageTestResult> {
   if (config.type === 'none') {
     return {
@@ -44,6 +51,21 @@ export async function testStorageProvider(
 
   if (config.type === 'custom') {
     return testCustomEndpoint(config.endpoint);
+  }
+
+  if (config.type === 's3') {
+    if (!hostCtx) {
+      return {
+        success: false,
+        message: 'Cannot test S3 provider without the Worker API endpoint and key.',
+      };
+    }
+    const provider = new S3StorageProvider({
+      config: config.s3,
+      apiEndpoint: hostCtx.apiEndpoint,
+      apiKey: hostCtx.apiKey,
+    });
+    return provider.testConnection();
   }
 
   // Exhaustiveness guard.

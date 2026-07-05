@@ -1,76 +1,43 @@
 # AGENTS.md
 
-<!--
-  PURPOSE: Project entry point and tech-stack summary for AI agents.
-  This file is the FIRST thing an agent reads when starting work on a project.
-
-  INSTRUCTIONS FOR USE:
-  1. Copy this file to your project root as `AGENTS.md`
-  2. Replace all [PLACEHOLDER: ...] markers with your project's specifics
-  3. Delete any sections that don't apply to your project
-  4. Delete this HTML comment block once populated
-
-  This template is intentionally verbose. Remove what you don't need.
-  A shorter, accurate AGENTS.md is better than a long, vague one.
--->
-
 ## Project Overview
-**Purpose:** [PLACEHOLDER: One-sentence description of what this project is and does. Be specific — name the problem domain, the primary users, and the core value proposition.]
+**Purpose:** NB-Feedback-Kit is a drop-in, MIT-licensed feedback collection system for React applications — bug reports, feature requests, and feedback are submitted from a headless React SDK, routed through a Cloudflare Worker API, and persisted as GitHub Issues, with GitHub Releases and a label-based roadmap surfaced back to end users.
 
 **Key Business Constraints:**
-<!--
-  List the non-negotiable rules the system must enforce.
-  These are constraints that, if violated, constitute a critical bug.
-  Format each as a bullet with a bold name and a clear explanation.
-
-  Examples of constraint categories:
-  - Authentication / Authorization model
-  - Data isolation requirements (multi-tenant, user-scoped, etc.)
-  - Financial / billing invariants (ledger accuracy, pre-deduction, etc.)
-  - Data privacy boundaries (PII handling, anonymization, etc.)
-  - Domain-specific business rules (grading models, workflow states, etc.)
-  - Storage / retention policies
--->
-- **[PLACEHOLDER: Constraint Name]:** [PLACEHOLDER: Description of the constraint and why it exists]
+- **Server-Side GitHub Token Isolation:** The GitHub PAT (`GITHUB_TOKEN`) must never reach the client. It lives only as a Worker secret and is used server-side by the API to call the GitHub REST API. Clients authenticate with a rotating `X-API-Key` mapped to repo coordinates via Workers KV.
+- **Client-Side Screenshot Upload:** Screenshot upload is performed entirely client-side by the SDK's `StorageProvider`. The Worker never receives or stores screenshot bytes. Host apps configure a custom HTTP endpoint via `StorageConfigPanel`; the SDK uploads directly to it and attaches the returned URL to the feedback payload. The Worker's only screenshot-related responsibility is sanitizing the attachment URLs in `sanitizeAttachments` before interpolating them into the GitHub issue body.
+- **Per-Key Rate Limiting:** All `/api/*` routes enforce per-API-key rate limits via the `RateLimiter` Durable Object. Rate-limit logic must remain isolated in the DO — do not inline counters into route handlers.
+- **Attachment Sanitization:** Client-supplied attachment URLs are rebuilt from validated primitives server-side before interpolation into the GitHub issue body. Only `http`/`https` URLs are allowed; attachment count is capped at 5; fields are length-trimmed. Never disable or bypass `sanitizeAttachments`.
+- **Storage Provider Abstraction:** The issue provider (GitHub) only ever receives `UploadedFile` URLs — never raw image bytes. Storage providers must implement the `StorageProvider` interface and never leak provider-specific details into the SDK's public API.
+- **Auth-Protected API Surface:** `GET /health` and `GET /` are the only unauthenticated routes. Every state-changing or data-returning endpoint sits under `/api/*` behind `createAuthMiddleware`.
 
 **Critical Success Criteria:**
-<!--
-  List the measurable outcomes that define project success.
-  These should be testable assertions, not aspirations.
-  If a criterion cannot be tested, reword it until it can be.
--->
-- **[PLACEHOLDER: Criterion Name]:** [PLACEHOLDER: Description of what must be true for this criterion to be met]
+- **End-to-End Feedback Flow:** A user can click a feedback button, fill a form, optionally attach a screenshot, and a GitHub Issue is created with correct labels (`bug`/`feature`/`feedback`) and a rendered metadata table.
+- **Screenshot Attachment Flow:** When a storage provider is configured, a selected screenshot is uploaded client-side to the configured endpoint and the returned URL is embedded as a Markdown image in the created GitHub issue.
+- **Release Notes & Roadmap:** `GET /api/releases` returns versioned release notes and `GET /api/roadmap` returns label-driven roadmap items, both rendered by the SDK modals.
+- **Zero Client-Side Secrets:** The published SDK bundle contains no embedded tokens, API keys, or GitHub credentials.
+- **Headless Portability:** SDK components render without built-in styles so any host app can adopt them without visual conflicts.
 
 ---
 
 ## Tech Stack
-<!--
-  List the concrete technologies chosen for each layer.
-  Be specific about versions if a particular version is required.
-  If a decision was made via an ADR, reference it.
-
-  Keep the categories that apply; delete those that don't.
-  Add categories as needed (e.g., "Mobile", "Desktop", "CLI", "AI/ML").
--->
-- **Frontend:** [PLACEHOLDER: Framework + UI library + styling approach — e.g., React / Next.js + Shadcn/ui + Tailwind CSS]
-- **State Management:** [PLACEHOLDER: e.g., Zustand, Redux Toolkit, React Context — or "N/A (server-rendered)"]
-- **Backend:** [PLACEHOLDER: Framework + language — e.g., NestJS + TypeScript, Express + Node.js, FastAPI + Python]
-- **Database:** [PLACEHOLDER: Engine + ORM — e.g., PostgreSQL + Prisma, MySQL + TypeORM, SQLite + Drizzle]
-- **AI/LLM Layer:** [PLACEHOLDER: Provider + orchestration approach — e.g., OpenRouter, OpenAI API, local model. Delete if not applicable.]
-- **Testing:** [PLACEHOLDER: Unit/Integration framework + E2E framework — e.g., Vitest + Playwright, Jest + Cypress]
-- **Infrastructure:** [PLACEHOLDER: Deployment target + containerization — e.g., Render + Docker, AWS ECS, Vercel]
-- **Monitoring:** [PLACEHOLDER: Observability tools — e.g., Sentry, PostHog, Datadog. Delete if not yet decided.]
+- **Frontend:** React 18 + TypeScript 5.7 (headless components, inline-minimal styles, className passthrough)
+- **State Management:** React Context (`FeedbackProvider`) — no external state library
+- **Backend:** Cloudflare Workers + Hono ^4.6.14 (TypeScript)
+- **Storage:** Workers KV (API-key → repo mapping), Durable Objects (per-key rate limiting). No relational database, no object storage (R2 is not currently bound).
+- **Issue/Release Source:** GitHub REST API (Issues, Releases, label-based roadmap)
+- **Screenshot Storage:** Client-side only via `StorageProvider` (`NoneStorageProvider` or `CustomEndpointProvider`). The Worker does not handle screenshot bytes.
+- **Testing:** Vitest (API uses `@cloudflare/vitest-pool-workers`; SDK has `__tests__`); PowerShell smoke script (`packages/api/smoke-feedback.ps1`) for the feedback flow
+- **Infrastructure:** Cloudflare Workers (serverless), pnpm workspaces + Turborepo (monorepo orchestration), tsup (package builds — CJS + ESM + `.d.ts`)
+- **Monitoring:** Not yet decided (no Sentry/PostHog/Datadog integration — candidate for future work)
 
 ---
 
 ## Repository Structure
-<!--
-  Map each top-level directory to its responsibility.
-  This helps agents understand where code should live without exploring.
-  Keep this in sync with the actual directory structure.
--->
-- `/[PLACEHOLDER: dir]` = [PLACEHOLDER: responsibility]
-- `/[PLACEHOLDER: dir]` = [PLACEHOLDER: responsibility]
+- `/apps/demo-app` = Reference integration (Vite + React 18) demonstrating SDK usage
+- `/packages/api` = Cloudflare Worker API (Hono routes: `/api/feedback`, `/api/releases`, `/api/roadmap`; GitHub client; auth middleware; `RateLimiter` Durable Object; `sanitizeAttachments`)
+- `/packages/react-sdk` = Headless React components, hooks, client-side storage providers (`none` + `custom-endpoint`), metadata utils, `StorageConfigPanel` UI
+- `/packages/shared-types` = Shared TypeScript contracts (`FeedbackPayload`, `FeedbackResponse`, `UploadedFile`, `ReleaseNote`, `RoadmapItem`, etc.)
 - `/memory` = Local project documentation and permanent architectural decision logs
 - `/resources` = Project-specific registers and inventories (architecture, API, schema, risks, tech debt, tests, security)
 - `/standards` = Project-specific standards that specialise/override the general `.clinerules/` standards
@@ -82,19 +49,14 @@
 **See `.clinerules/architecture/core-principles.md` for complete architectural guidance.**
 
 Key principles:
-<!--
-  List the enforceable architectural boundaries specific to this project.
-  These should be rules that a code review or lint rule can verify.
-
-  Start with the universal principles below, then add project-specific ones.
-  Each rule should explain WHAT the boundary is and WHY it exists.
--->
-- **Separation of Concerns:** [PLACEHOLDER: e.g., "Parsing logic is isolated from API orchestration"]
-- **Dependency Direction:** Dependencies flow inward (UI → State/Services → Domain Logic → Data Access Layer).
-- **[PLACEHOLDER: Project-Specific Boundary]:** [PLACEHOLDER: Description — e.g., "All external API calls route through a single orchestration module"]
-- **[PLACEHOLDER: Project-Specific Boundary]:** [PLACEHOLDER: Description]
-- **Modification Rules:** Prefer extending existing configurations over creating new paradigms; avoid duplicating logic.
-- **Safety:** [PLACEHOLDER: List the absolute "never do this" rules — e.g., "Never disable authentication checks", "Never expose API keys to clients", "Never modify ledger balance rules without explicit request"]
+- **Separation of Concerns:** The SDK is headless (presentation only) and owns client-side screenshot upload via the `StorageProvider` abstraction; the Worker owns auth, rate limiting, sanitization, and GitHub orchestration; `shared-types` owns cross-package contracts.
+- **Dependency Direction:** Dependencies flow inward (SDK UI → SDK hooks/services → `shared-types` contracts ← API routes → GitHub client). The `shared-types` package has no runtime dependencies and depends on nothing.
+- **Server-Side Secret Boundary:** GitHub credentials live only in Worker secrets/bindings. Clients only ever hold a rotating `X-API-Key`.
+- **Client-Side Storage Boundary:** The Worker never receives screenshot bytes. Storage providers upload directly from the browser to a host-configured endpoint and return a URL that is later validated (not re-uploaded) by the Worker.
+- **Discriminated-Union Extensibility:** New storage providers are added by extending the `StorageProviderConfig` union in `packages/react-sdk/src/storage/types.ts` and adding a branch to the exhaustive `switch` in `createStorageProvider`. The `never` guard makes an unhandled branch a compile error.
+- **Auth-Protected Route Prefix:** `GET /health` and `GET /` are the only unauthenticated routes. Everything under `/api/*` must pass through `createAuthMiddleware`.
+- **Modification Rules:** Prefer extending existing configurations over creating new paradigms; avoid duplicating logic. Extend the storage-provider union rather than forking the upload path.
+- **Safety:** Never disable `createAuthMiddleware` on `/api/*` routes. Never expose `GITHUB_TOKEN` to the client. Never bypass `sanitizeAttachments`. Never render client-supplied URLs in the issue body without the `http`/`https` scheme check.
 
 ---
 
@@ -118,23 +80,23 @@ The workflow is a **session-scoped lifecycle**, not a per-task commit cycle. Ste
 2. **Invoke `NB-Context-Loader`** — initialize project context, load only the required information, and detect ambiguity. This skill determines whether clarification is needed before proceeding.
 3. **If ambiguity is detected, invoke `NB-Grill`** — structured discovery session to challenge assumptions, sharpen terminology, validate requirements, and establish shared understanding. Do not proceed to implementation until critical requirements are clear.
 4. **Invoke `NB-Task-Router`** — classify the work and route to the most appropriate specialist skill based on domain, complexity, and system context. This determines which specialist skill(s) to consult for implementation.
-5. Identify architectural boundaries [PLACEHOLDER: e.g., "(specifically the data scrubbing and credit verification boundaries)" — delete placeholder or name your project's critical boundaries].
+5. Identify architectural boundaries — specifically the **server-side secret boundary** (GitHub PAT isolation), the **auth-protected `/api/*` prefix**, the **client-side storage boundary** (Worker never handles screenshot bytes), the **storage-provider abstraction** (GitHub must only receive `UploadedFile` URLs), and the **attachment-sanitization boundary** (`sanitizeAttachments` before issue-body interpolation).
 6. Explain intended approach.
-7. Identify possible downstream effects [PLACEHOLDER: e.g., "on global user balance states or prompt injection risks" — delete placeholder or name your project's risk areas].
+7. Identify possible downstream effects — on **rate-limit behavior** (DO state), **GitHub issue formatting** (Markdown body rendered by GitHub), and **published SDK bundle** (no secrets may ship).
 
 ### Step 2 — During Coding
 1. Make surgical, scoped changes (see `.clinerules/agent-behavior.md § 3`).
-2. Preserve backward compatibility [PLACEHOLDER: e.g., "across the Subject-Level-Unit hierarchy" — delete or specify your domain hierarchy].
-3. Add structured logging around [PLACEHOLDER: e.g., "text parsing states and OpenRouter tokens used" — specify your critical logging points].
-4. Avoid speculative refactors of the design layout system.
+2. Preserve backward compatibility across the **SDK public exports** (`FeedbackProvider`, `useFeedback`, `useSubmitFeedback`, `FeedbackButton`, `FeedbackModal`, `StorageConfigPanel`, storage providers) and the **API contract** (`FeedbackPayload`/`FeedbackResponse` shapes, route paths, `X-API-Key` auth).
+3. Add structured logging around **screenshot upload outcomes** (client-side, in the SDK), **GitHub issue creation** (issue URL, app name), **auth failures** (key prefix only, never the full key), and **rate-limit rejections**.
+4. Avoid speculative refactors of the storage-provider abstraction or the GitHub issue-body formatter.
 
 ### Step 3 — After Coding: Verify & Impact Review
-1. Run [PLACEHOLDER: test suite command — e.g., `vitest run`].
-2. Run linting and type checks.
-3. Verify affected UI components and [PLACEHOLDER: critical flows — e.g., "report generation flows"] manually.
+1. Run `pnpm turbo run test typecheck` from the repo root (runs Vitest + `tsc --noEmit` across all packages).
+2. Run linting and type checks (`pnpm turbo run typecheck` at minimum).
+3. Verify affected UI components and **critical flows** (feedback submission → GitHub Issue creation; screenshot upload via configured storage provider → URL attached to issue; releases/roadmap fetch) manually, or via `packages/api/smoke-feedback.ps1`.
 4. Summarize changes and risks.
 5. **Invoke `NB-Security-Engineer`** — assess security impact (auth boundaries, input validation, secret exposure, injection risks, PII handling). Security concerns must be documented and either resolved or accepted as risks before proceeding.
-6. **Invoke `NB-DevOps-Engineer`** — assess deployment/infrastructure impact (environment variables, Docker configs, CI/CD pipeline, database migrations, runtime dependencies). Infrastructure changes must be documented.
+6. **Invoke `NB-DevOps-Engineer`** — assess deployment/infrastructure impact (Worker secrets, `wrangler.toml` bindings (KV/DO), `pnpm` workspace deps). Infrastructure changes must be documented.
 
 ### Step 4 — Do NOT Commit Per Task
 > **Standing rule:** Do not commit after each coding task. Changes accumulate across the session and are committed once at session end (Step 7). This keeps the commit history clean with one meaningful commit per session rather than fragmented per-task commits.
@@ -188,23 +150,20 @@ The following skills must be consulted at specific points in the workflow. Failu
 | `NB-Task-Router` | After context loaded + ambiguity resolved | Classify work, route to specialist skill |
 
 ### Specialist Skills (Routed by `NB-Task-Router`)
-<!--
-  List the specialist skills relevant to your project's tech stack.
-  Delete rows that don't apply. Add rows as needed.
--->
 | Skill | Domain |
 |-------|--------|
-| `NB-Backend-Specialist` | [PLACEHOLDER: e.g., NestJS, Prisma, APIs, database models, multi-tenant logic] |
-| `NB-Frontend-Web-Specialist` | [PLACEHOLDER: e.g., React/Next.js, UI components, styling, optimization] |
-| `NB-PostgreSQL-Architect` | [PLACEHOLDER: All schema/data-model decisions — delete if using a different database] |
-| `NB-QA-Engineer` | Testing standards, test matrix, regression coverage |
+| `NB-Backend-Specialist` | Cloudflare Workers + Hono routes, GitHub REST client, auth middleware, rate-limit DO, `sanitizeAttachments` |
+| `NB-Frontend-Web-Specialist` | React 18 SDK — headless components, hooks, client-side storage providers, metadata utils, tsup build |
+| `NB-QA-Engineer` | Testing standards, test matrix, regression coverage, smoke-script maintenance |
+
+> **Note:** No relational database or object storage is used (KV + DO only), so `NB-PostgreSQL-Architect` does not apply.
 
 ### Mandatory Impact Review (Step 3 — After ALL code changes)
 
 | Skill | Scope |
 |-------|-------|
-| `NB-Security-Engineer` | Auth, input validation, secrets, injection, PII — must resolve or accept risks |
-| `NB-DevOps-Engineer` | Env vars, Docker, CI/CD, migrations, runtime deps |
+| `NB-Security-Engineer` | Auth (`X-API-Key`, KV lookup), attachment sanitization, secret isolation (GitHub PAT), injection risks in issue body — must resolve or accept risks |
+| `NB-DevOps-Engineer` | Worker secrets, `wrangler.toml` bindings (KV/DO), `pnpm` workspace deps, Turborepo pipeline, Wrangler deploy |
 
 ### Session Lifecycle
 
@@ -221,41 +180,36 @@ The following skills must be consulted at specific points in the workflow. Failu
 **See `.clinerules/testing.md` for complete testing standards.**
 
 Summary:
-- All changes affecting validation logic must include happy path, edge case [PLACEHOLDER: e.g., "(partial correctness, cascade edge cases)"], and failure case [PLACEHOLDER: e.g., "(text parsing failure)"] tests.
-- [PLACEHOLDER: List any systems requiring mandatory integration coverage — e.g., "Financial systems (credit deductions, refunds) and PII filters require mandatory integration coverage and regression protection." Delete if not applicable.]
-- E2E smoke-test scripts via [PLACEHOLDER: Playwright/Cypress] must verify the critical user pathway: [PLACEHOLDER: e.g., "Login → Upload → Process → Result Display"].
-- [PLACEHOLDER: List any deferred testing — e.g., "Component-level styling and visual regression testing deferred post-MVP." Delete if not applicable.]
-- Before merge: all tests pass, linting passes, type checks pass, security checks pass.
+- All changes affecting validation logic must include happy path, edge case (invalid feedback type, malformed attachment URL, non-image content type), and failure case (GitHub API failure, KV auth miss, rate-limit rejection) tests.
+- The **API↔GitHub integration** and the **attachment-sanitization path** require mandatory integration coverage and regression protection — these are security-critical and must not regress silently.
+- Smoke-test scripts via `packages/api/smoke-feedback.ps1` must verify the critical user pathway: **FeedbackButton → FeedbackModal → POST /api/feedback → GitHub Issue created** (and optionally **screenshot upload → configured endpoint → URL attached to issue**).
+- Component-level styling and visual regression testing are deferred post-MVP — the SDK is headless and host-styled.
+- Before merge: all tests pass (`pnpm turbo run test`), linting passes, type checks pass (`pnpm turbo run typecheck`), security checks pass.
 
 ---
 
 ## Debugging Protocol
 
 When debugging:
-1. Reproduce issue (utilizing diagnostic tools like [PLACEHOLDER: e.g., "Playwright traces or Sentry error reports"])
-2. Identify root cause
-3. Explain failing assumption [PLACEHOLDER: e.g., "(especially regarding prompt hallucinations or context window limitations)" — delete or specify your project's common failure modes]
-4. Verify fix minimally
-5. Confirm no regression introduced [PLACEHOLDER: e.g., "to historical outputs" — specify what must not break]
+1. Reproduce issue (utilizing diagnostic tools like `wrangler tail` for Worker logs, the `smoke-feedback.ps1` script for end-to-end repro, and the `Test Connection` probe in `StorageConfigPanel` for storage issues).
+2. Identify root cause.
+3. Explain failing assumption — common failure modes in this project are **CORS misconfiguration on client-side storage uploads** (custom endpoints), **GitHub PAT permission gaps** (missing `issues: write` / `contents: read`), **KV key-mapping drift** (API key not mapped to the right repo), and **storage endpoint misconfiguration** (wrong URL, wrong response path, missing auth headers).
+4. Verify fix minimally.
+5. Confirm no regression introduced — especially to **existing issue-body formatting**, **attachment sanitization**, and **rate-limit correctness**.
 
 Never:
-- apply speculative fixes to core processing chains
+- apply speculative fixes to the GitHub issue-body formatter or the attachment-sanitization chain
 - rewrite unrelated modules
-- suppress error states without explanation [PLACEHOLDER: e.g., "inside the credit ledger loop" — delete or specify]
+- suppress error states without explanation — particularly inside the GitHub-client response handling
 
 ---
 
 ## Performance Expectations
-<!--
-  List the performance constraints agents must respect.
-  These should be measurable or at least directional.
-  Remove items that don't apply to your project.
--->
-- Avoid unnecessary database queries during [PLACEHOLDER: e.g., "active LLM evaluation streaming"].
-- Prefer streaming structures for [PLACEHOLDER: e.g., "displaying real-time feedback"].
-- Minimize frontend re-renders during [PLACEHOLDER: e.g., "document transformation"].
-- Enforce mobile view optimization via mobile-first layout rules.
-- Do not optimize without measuring; profile first to identify bottlenecks.
+- Avoid unnecessary GitHub REST calls during feedback submission — one `createGitHubIssue` per request, no batching.
+- Minimize frontend re-renders during feedback form entry and modal open/close.
+- Keep the published SDK bundle small — the SDK has only one runtime dependency (`shared-types`); do not add heavy libraries.
+- Enforce mobile view optimization via mobile-first layout rules in the demo app and any host integration.
+- Do not optimize without measuring; profile first to identify bottlenecks (use `wrangler tail`, Worker analytics, and React DevTools).
 
 ---
 
@@ -267,8 +221,9 @@ Never:
 
 Update documentation when:
 - architecture changes
-- [PLACEHOLDER: e.g., "OpenRouter prompt engineering patterns shift" — delete or specify your domain]
-- APIs change
+- the API surface changes (new routes, changed `FeedbackPayload`/`FeedbackResponse` shapes, new storage-provider branches)
+- the SDK public exports change
+- `wrangler.toml` bindings change (new KV/DO namespaces)
 - workflows change
 - deployment changes
 - significant decisions are made
@@ -300,11 +255,11 @@ Format:
 
 ## Definition of Done
 A task is complete only if:
-- implementation works [PLACEHOLDER: e.g., "on both desktop and mobile web views" — delete or specify your target platforms]
-- tests ([PLACEHOLDER: e.g., "Vitest + Playwright"]) pass
+- implementation works on modern desktop and mobile web browsers (the SDK is browser-targeted; the Worker is edge-runtime-targeted)
+- tests (`pnpm turbo run test` — Vitest) pass
 - linting passes
-- type checks pass
-- security checks pass [PLACEHOLDER: e.g., "(and PII screening checks pass)" — delete or specify]
-- architecture rules followed
+- type checks pass (`pnpm turbo run typecheck`)
+- security checks pass — specifically `sanitizeAttachments` integrity, `X-API-Key` enforcement on `/api/*`, and no client-side secret leakage
+- architecture rules followed (server-side secret boundary, client-side storage boundary, storage-provider abstraction, auth-protected route prefix)
 - documentation updated
 - no critical regressions identified
