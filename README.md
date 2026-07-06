@@ -1,177 +1,278 @@
+<div align="center">
+
+<img src="assets/NBFeedbackKit_Logo_Transparent.png" width="140" alt="NB Feedback Kit logo" />
+
 # NB Feedback Kit
 
-A drop-in feedback system for React applications. Collect bug reports, feature requests, and feedback — automatically routed to GitHub Issues. Also surfaces your GitHub Releases and roadmap to users, all from headless, customizable components.
+**Secure, GitHub-native feedback infrastructure for React & React Native.**
 
-```
-┌─────────────┐     ┌──────────────────────┐     ┌─────────────┐
-│  React SDK  │ ──► │  Cloudflare Worker   │ ──► │   GitHub    │
-│  (your app) │ ◄── │  (API + rate limit)  │ ◄── │  Issues/    │
-└─────────────┘     └──────────────────────┘     │  Releases   │
-                          │                       └─────────────┘
-                          │ KV: API key → repo
-                          │ DO: per-key rate limit
-                          ▼
-                    GitHub PAT (server-side secret)
-```
+In-app feedback, screenshots, issues, roadmaps, and release notes — using *your* GitHub, *your* storage, and *your* infrastructure.
 
-## Why use this?
+[![License: MIT][license]](LICENSE)
+[![Latest Release][release]](https://github.com/Nealsch/nb-feedback-kit/releases/latest)
+[![GitHub Stars][stars]](https://github.com/Nealsch/nb-feedback-kit/stargazers)
+[![Forks][forks]](https://github.com/Nealsch/nb-feedback-kit/network/members)
 
-- **GitHub-native:** Feedback becomes GitHub Issues with auto-applied labels (`bug`, `feature-request`, `feedback`, `beta-feedback`). No separate ticketing system.
-- **Secure by design:** Your GitHub PAT never touches the client. API keys are low-trust, rate-limited, and map server-side to a single repo (ADR-005).
-- **Headless & customizable:** Components ship with minimal base styles. Bring your own design system.
-- **Multi-project:** One API instance serves multiple applications — each API key routes to its own repo.
-- **Bonus features:** Release Notes modal (from GitHub Releases) and Roadmap modal (from labeled Issues) included.
+[![npm version][npm]](https://www.npmjs.com/package/nb-feedback-kit)
+[![Downloads][downloads]](https://www.npmjs.com/package/nb-feedback-kit)
+[![TypeScript][ts]](https://www.typescriptlang.org/)
+[![React][react]](https://react.dev/)
+[![React Native][rn]](https://reactnative.dev/)
+[![Build Status][build]](https://github.com/Nealsch/nb-feedback-kit/actions/workflows/ci.yml)
+
+</div>
 
 ---
 
-## Quick Start
-
-### Option A: Use the hosted API (fastest)
-
-1. **Get an API key** mapped to your GitHub repo (configured in the API's KV store).
-2. **Install the SDK:**
-
-   ```bash
-   npm install @nb-feedback-kit/react-sdk
-   ```
-
-3. **Add to your app:**
-
-   ```tsx
-   import { FeedbackProvider, FeedbackButton, FeedbackModal } from '@nb-feedback-kit/react-sdk';
-
-   function App() {
-     return (
-       <FeedbackProvider
-         config={{
-           applicationName: 'My App',
-           version: '1.0.0',
-           apiEndpoint: 'https://your-api-endpoint.workers.dev',
-           apiKey: 'your-api-key',
-         }}
-       >
-         <FeedbackButton onClick={open} />
-         <FeedbackModal isOpen={isOpen} onClose={close} />
-       </FeedbackProvider>
-     );
-   }
-   ```
-
-See the **[SDK README](packages/react-sdk/README.md)** for the full component and hook API.
-
-### Option B: Self-host the API
-
-Deploy your own Cloudflare Worker with KV (API keys) and Durable Objects (rate limiting).
-
-1. Clone this repo.
-2. Follow **[Cloudflare Setup Guide](packages/api/CLOUDFLARE_SETUP.md)**.
-3. Set your `GITHUB_TOKEN` secret and populate `API_KEYS` in KV.
-4. Deploy: `pnpm wrangler deploy --env production`.
+> **Own your feedback.**
+>
+> **Your GitHub. Your storage. Your infrastructure. No vendor lock-in.**
 
 ---
 
-## Packages
-
-| Package | Path | Description |
-|---------|------|-------------|
-| `@nb-feedback-kit/react-sdk` | [`packages/react-sdk`](packages/react-sdk) | Headless React components and hooks |
-| `@nb-feedback-kit/api` | [`packages/api`](packages/api) | Cloudflare Worker API (Hono + KV + Durable Objects) |
-| `@nb-feedback-kit/shared-types` | [`packages/shared-types`](packages/shared-types) | Shared TypeScript contracts |
-| Demo app | [`apps/demo-app`](apps/demo-app) | Reference integration (Vite + React 18) |
-
----
-
-## Documentation
-
-| Document | Purpose |
-|----------|---------|
-| **[SDK README](packages/react-sdk/README.md)** | How to integrate the React SDK (primary consumer doc) |
-| **[API Reference](resources/api-reference.md)** | REST contract (endpoints, auth, error shapes) |
-| **[Cloudflare Setup](packages/api/CLOUDFLARE_SETUP.md)** | Deploy your own API instance |
-| **[Security Review](resources/security-reports/task-005-006-security-review.md)** | Auth, rate limiting, and secret handling assessment |
-| **[Architecture Decisions](memory/project-decisions.md)** | ADRs (server-side routing, labels, etc.) |
-| **[Demo App README](apps/demo-app/README.md)** | Run the reference integration locally |
+<p align="center">
+  <a href="#quick-start"><strong>Quick Start</strong></a> &nbsp;·&nbsp;
+  <a href="#features"><strong>Features</strong></a> &nbsp;·&nbsp;
+  <a href="#architecture"><strong>Architecture</strong></a> &nbsp;·&nbsp;
+  <a href="#documentation"><strong>Docs</strong></a> &nbsp;·&nbsp;
+  <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
+</p>
 
 ---
 
-## How It Works
+<p align="center">
+  <img src="assets/FeedbackKitBanner.png" alt="NB Feedback Kit — the complete feedback ecosystem" width="860" />
+</p>
 
-### Feedback Flow
+---
 
-1. User clicks the **FeedbackButton** → **FeedbackModal** opens.
-2. User selects type (Bug / Feature / Feedback), enters title + description.
-3. SDK auto-captures metadata (browser, OS, route, screen size, timestamp, optional userId).
-4. SDK POSTs to `/api/feedback` with `X-API-Key`.
-5. API validates the key (KV lookup) → checks rate limit (Durable Object) → creates a GitHub Issue.
-6. Issue is auto-labeled: `bug`/`feature-request`/`feedback` + `beta-feedback`.
-7. SDK shows success with a link to the created issue.
+## Why NB Feedback Kit?
 
-### Release Notes & Roadmap
+Building feedback into an app usually forces a hard choice:
 
-- **`GET /api/releases`** → fetches latest 10 GitHub Releases (version, date, body, link).
-- **`GET /api/roadmap`** → fetches Issues labeled `planned` / `in-progress` / `released`.
+1. **Build it yourself** — significant engineering effort and ongoing maintenance.
+2. **Adopt a hosted SaaS** — recurring costs, a duplicate workflow, another user account, and your product data living in someone else's infrastructure.
+
+NB Feedback Kit is a third option: **reusable, open infrastructure that extends the tools you already use.** You keep GitHub as the system of record, keep screenshots in your own object storage, and keep the backend on infrastructure you own. No proprietary platform, no data export, no lock-in.
+
+| Capability | <img src="assets/icons/folder-git-2.svg" width="16" /> &nbsp;NB Feedback Kit | Hosted SaaS | DIY build |
+|---|:--:|:--:|:--:|
+| GitHub-native | <img src="assets/icons/check.svg" width="16" /> | — | — |
+| Own your storage | <img src="assets/icons/check.svg" width="16" /> | — | <img src="assets/icons/check.svg" width="16" /> |
+| Self-hosted | <img src="assets/icons/check.svg" width="16" /> | — | <img src="assets/icons/check.svg" width="16" /> |
+| Vendor neutral | <img src="assets/icons/check.svg" width="16" /> | — | <img src="assets/icons/check.svg" width="16" /> |
+| Setup in minutes | <img src="assets/icons/check.svg" width="16" /> | <img src="assets/icons/check.svg" width="16" /> | — |
+| No per-seat pricing | <img src="assets/icons/check.svg" width="16" /> | — | <img src="assets/icons/check.svg" width="16" /> |
+
+---
+
+## Features
+
+| | Feature | Description |
+|:--:|---|---|
+| <img src="assets/icons/folder-git-2.svg" width="20" /> | **GitHub-native** | Feedback becomes GitHub Issues. Releases, labels, and milestones stay where your team already works. |
+| <img src="assets/icons/camera.svg" width="20" /> | **Screenshot Uploads** | Users attach screenshots stored directly in your own S3-compatible bucket. |
+| <img src="assets/icons/file-text.svg" width="20" /> | **Release Notes** | Surface changelogs from GitHub Releases inside your app, automatically. |
+| <img src="assets/icons/map.svg" width="20" /> | **Roadmap** | Render a public roadmap driven by GitHub labels and milestones. |
+| <img src="assets/icons/database.svg" width="20" /> | **S3-compatible Storage** | Bring Amazon S3, Cloudflare R2, MinIO, Backblaze B2, or any compatible provider. |
+| <img src="assets/icons/shield-check.svg" width="20" /> | **Authentication** | Device-based auth and JWT sessions keep access controlled and revocable. |
+| <img src="assets/icons/gauge.svg" width="20" /> | **Rate Limiting** | Built-in abuse protection prevents spam and runaway costs. |
+| <img src="assets/icons/smartphone.svg" width="20" /> | **Device Security** | Devices can be authenticated, tracked, and revoked individually. |
+| <img src="assets/icons/atom.svg" width="20" /> | **React** | First-class provider, hooks, and UI components for React. |
+| <img src="assets/icons/smartphone.svg" width="20" /> | **React Native** | Same SDK model for React Native on iOS and Android. |
+| <img src="assets/icons/server.svg" width="20" /> | **Self Hosted** | Deploy the backend anywhere — your laptop, a VPS, or the cloud. |
+| <img src="assets/icons/heart.svg" width="20" /> | **Open Source** | MIT-licensed, transparent, and built for contributions. |
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="assets/Architecture_Diagram.png" alt="NB Feedback Kit high-level architecture" width="820" />
+</p>
+
+NB Feedback Kit is a thin **bridge**, not a replacement for your tools.
+
+1. **Your app** (React or React Native) embeds the SDK.
+2. The **SDK** talks only to your **NB Feedback backend**.
+3. The backend creates **GitHub Issues** and reads Releases, labels, and milestones for the roadmap.
+4. Screenshots are streamed to **your S3-compatible object storage**.
+
+Credentials for GitHub and storage never leave the backend, and the client is never trusted with them.
+
+---
+
+## Feedback Workflow
+
+<p align="center">
+  <img src="assets/Feedback_Diagram.png" alt="The NB Feedback Kit feedback lifecycle" width="820" />
+</p>
+
+The lifecycle closes the loop between users and developers:
+
+1. A user **submits feedback** — optionally with a **screenshot**.
+2. The backend creates a **GitHub Issue** and uploads the screenshot to your storage.
+3. Your team **triages and fixes** the issue in GitHub.
+4. You publish a **GitHub Release**.
+5. **Release Notes** and **Roadmap** update inside your app automatically — so the user sees the outcome.
 
 ---
 
 ## Security
 
-- **API keys** are low-trust: rate-limited (60s sliding window per key), scoped to one repo.
-- **GitHub PAT** is a server-side Cloudflare secret — never shipped to the client.
-- **CORS** is permissive in development (`origin: '*'`). **Restrict to known domains before production launch.**
-- See the full [security review](resources/security-reports/task-005-006-security-review.md) (PASS — 0 Critical, 0 High).
+<p align="center">
+  <img src="assets/Security_Diagram.png" alt="Security model — credentials stay server-side" width="820" />
+</p>
+
+Security is the default, not an add-on.
+
+- <img src="assets/icons/key-round.svg" width="16" /> &nbsp;**Tokens never reach clients.** GitHub tokens and storage credentials live only on the backend.
+- <img src="assets/icons/lock.svg" width="16" /> &nbsp;**Storage credentials stay server-side.** Clients receive short-lived, scoped access — never the secret key.
+- <img src="assets/icons/globe.svg" width="16" /> &nbsp;**HTTPS only.** All traffic is encrypted in transit.
+- <img src="assets/icons/shield-check.svg" width="16" /> &nbsp;**Validation.** Every request is schema-validated before it touches GitHub or storage.
+- <img src="assets/icons/users.svg" width="16" /> &nbsp;**Authentication.** Device-based auth and JWT sessions identify and scope every caller.
+- <img src="assets/icons/gauge.svg" width="16" /> &nbsp;**Rate limiting.** Per-device and global limits prevent abuse and protect your quota.
+
+Read the full model in the [Security documentation](docs/security.md).
 
 ---
 
-## Tech Stack
+## Multi-project Support
 
-- **Frontend:** React 18 + TypeScript (headless components)
-- **API:** Hono.js on Cloudflare Workers
-- **Storage:** Cloudflare KV (API keys) + Durable Objects (rate limiting)
-- **Integration:** GitHub REST API (Issues + Releases)
-- **Build:** Vite + Turborepo + pnpm workspaces
+<p align="center">
+  <img src="assets/Multi-Project-Architecture-Diagram.png" alt="One backend serving multiple projects with isolation" width="820" />
+</p>
+
+A **single backend** can securely serve multiple applications. Each project is independently configured with its own GitHub repository and storage bucket, so issues, screenshots, and roadmaps stay **isolated** — even when they share infrastructure.
+
+- One deployment, many apps.
+- Per-project GitHub repository mapping.
+- Per-project storage isolation.
+- Centralised auth, rate limiting, and observability.
 
 ---
 
-## Development
+## Installation
+
+Install the SDK with your preferred package manager:
 
 ```bash
-# Install dependencies
-pnpm install
+# npm
+npm install nb-feedback-kit
 
-# Run the demo app (uses local SDK + API)
-pnpm dev
+# pnpm
+pnpm add nb-feedback-kit
 
-# Run API tests
-cd packages/api && pnpm test
+# yarn
+yarn add nb-feedback-kit
 
-# Build all packages
-pnpm build
+# bun
+bun add nb-feedback-kit
 ```
+
+> The backend is a separate, self-hostable service. See [Backend deployment](docs/backend.md) for deployment options.
 
 ---
 
-## Status
+## Quick Start
 
-**MVP delivered** — all 13 planned tasks complete. See the [project board](memory/tasks/project-board.md) for details.
+The shortest path to live feedback — under five minutes.
 
-### Pre-production checklist
+### 1. Configure the backend
 
-Before going live:
+Deploy the backend and provide your GitHub token and S3-compatible storage credentials as environment variables. The SDK only needs the backend URL.
 
-- [ ] Set `GITHUB_TOKEN` via `wrangler secret put`
-- [ ] Create `API_KEYS` KV namespace and populate with real key→repo mappings
-- [ ] Restrict CORS origins to known application domains
-- [ ] Create GitHub labels: `bug`, `feature-request`, `feedback`, `beta-feedback`, `planned`, `in-progress`, `released`
+```bash
+# backend environment
+GITHUB_TOKEN=ghp_your_token
+S3_ENDPOINT=https://your-storage.example.com
+S3_ACCESS_KEY_ID=your_access_key
+S3_SECRET_ACCESS_KEY=your_secret_key
+S3_BUCKET=feedback-screenshots
+```
 
-### Deferred (post-MVP)
+### 2. Wrap your React app
 
-- Screenshot upload (requires Cloudflare R2)
-- Feature voting
-- User feedback portal
-- AI categorization / deduplication
+```tsx
+import { FeedbackProvider, FeedbackButton } from 'nb-feedback-kit'
+
+export default function App() {
+  return (
+    <FeedbackProvider backendUrl="https://feedback.example.com" projectId="my-app">
+      <YourApp />
+      <FeedbackButton />
+    </FeedbackProvider>
+  )
+}
+```
+
+### 3. Collect feedback
+
+That's it. The `<FeedbackButton />` opens the dialog, collects the message and optional screenshot, and creates a GitHub Issue on your repository — all without exposing any credentials to the client.
+
+React Native follows the same model via the `FeedbackProvider`. See the [React](docs/react.md) and [React Native](docs/react-native.md) guides for hooks, custom UI, and advanced configuration.
+
+---
+
+## Documentation
+
+| | Topic | Description |
+|:--:|---|---|
+| <img src="assets/icons/rocket.svg" width="18" /> | [Getting Started](docs/getting-started.md) | From zero to your first piece of feedback. |
+| <img src="assets/icons/download.svg" width="18" /> | [Installation](docs/installation.md) | Package managers, peer deps, and versioning. |
+| <img src="assets/icons/server.svg" width="18" /> | [Backend](docs/backend.md) | Deploy and configure the self-hosted backend. |
+| <img src="assets/icons/atom.svg" width="18" /> | [React](docs/react.md) | Provider, hooks, and UI components. |
+| <img src="assets/icons/smartphone.svg" width="18" /> | [React Native](docs/react-native.md) | Mobile integration for iOS and Android. |
+| <img src="assets/icons/database.svg" width="18" /> | [Storage Providers](docs/storage-providers.md) | S3, R2, MinIO, B2, and more. |
+| <img src="assets/icons/shield-check.svg" width="18" /> | [Authentication](docs/authentication.md) | Device auth, JWT, and revocation. |
+| <img src="assets/icons/lock.svg" width="18" /> | [Security](docs/security.md) | Threat model and hardening guide. |
+| <img src="assets/icons/code.svg" width="18" /> | [Examples](docs/examples.md) | Runnable React and React Native apps. |
+| <img src="assets/icons/book-open.svg" width="18" /> | [FAQ](docs/faq.md) | Common questions, answered. |
+
+---
+
+## Roadmap
+
+The roadmap is managed where the project lives — **on GitHub**, not in a separate tool. Labels and milestones drive what ships next.
+
+See [`ROADMAP.md`](ROADMAP.md) for planned work, and watch **Issues** labeled `enhancement` for upcoming features.
+
+---
+
+## Contributing
+
+Contributions are welcome and appreciated. Whether it's a bug report, a feature idea, a docs improvement, or a pull request — there's a place for you here.
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to set up the project and open a PR.
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — our community standards.
+
+---
+
+## Security Policy
+
+Found a vulnerability? **Please don't open a public issue.**
+
+Report it privately per the instructions in [`SECURITY.md`](SECURITY.md).
 
 ---
 
 ## License
 
-MIT
+NB Feedback Kit is released under the **[MIT License](LICENSE)**.
+
+<p align="center">
+  <sub>Built with care for developers who want to own their feedback.</sub>
+</p>
+
+<!-- Badge references (kept here so the hero stays scannable) -->
+
+[license]: https://img.shields.io/badge/license-MIT-orange?style=flat-square
+[release]: https://img.shields.io/github/v/release/Nealsch/nb-feedback-kit?style=flat-square&color=f97316
+[stars]: https://img.shields.io/github/stars/Nealsch/nb-feedback-kit?style=flat-square&color=f97316
+[forks]: https://img.shields.io/github/forks/Nealsch/nb-feedback-kit?style=flat-square&color=f97316
+[npm]: https://img.shields.io/npm/v/nb-feedback-kit?style=flat-square&color=f97316
+[downloads]: https://img.shields.io/npm/dm/nb-feedback-kit?style=flat-square&color=f97316
+[ts]: https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white
+[react]: https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black
+[rn]: https://img.shields.io/badge/React_Native-61DAFB?style=flat-square&logo=react&logoColor=black
+[build]: https://img.shields.io/github/actions/workflow/status/Nealsch/nb-feedback-kit/ci.yml?style=flat-square&branch=main
