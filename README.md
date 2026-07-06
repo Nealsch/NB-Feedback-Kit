@@ -275,9 +275,7 @@ The best ways to support the project are:
 
 If you'd like to help fund continued development, you can also buy me a coffee.
 
-<a href="https://ko-fi.com/nealsch" target="_blank">
-  <img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com" height="42">
-</a>
+<a href='https://ko-fi.com/P4A122PD5F' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 Thank you for helping make NB Feedback Kit better.
 
