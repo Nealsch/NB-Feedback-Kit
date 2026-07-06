@@ -324,5 +324,5 @@ pwsh ./smoke-feedback.ps1
 ---
 
 <p align="center">
-  <sub>Stuck? <a href="https://github.com/Nealsch/NB-Feedback-Kit/issues">Open an issue</a> — we're happy to help.</sub>
+  <sub>Stuck? <a href="https://github.com/Nealsch/NB-Feedback-Kit/issues">Open an issue</a> — I'm happy to help.</sub>
 </p>

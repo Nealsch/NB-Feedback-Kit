@@ -232,6 +232,7 @@ React Native follows the same `FeedbackProvider` model. See the [React](docs/rea
 | <img src="assets/icons/lock.svg" width="18" /> | [Security](docs/security.md) | Threat model and hardening guide. |
 | <img src="assets/icons/code.svg" width="18" /> | [Examples](docs/examples.md) | Runnable React and React Native apps. |
 | <img src="assets/icons/book-open.svg" width="18" /> | [FAQ](docs/faq.md) | Common questions, answered. |
+| <img src="assets/icons/heart.svg" width="18" /> | [About](docs/about-me.md) | The story behind the project. |
 
 ---
 
@@ -248,7 +249,7 @@ See [`ROADMAP.md`](ROADMAP.md) for planned work, and watch **Issues** labeled `e
 Contributions are welcome and appreciated. Whether it's a bug report, a feature idea, a docs improvement, or a pull request — there's a place for you here.
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to set up the project and open a PR.
-- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — our community standards.
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — community standards.
 
 ---
 
@@ -257,6 +258,28 @@ Contributions are welcome and appreciated. Whether it's a bug report, a feature 
 Found a vulnerability? **Please don't open a public issue.**
 
 Report it privately per the instructions in [`SECURITY.md`](SECURITY.md).
+
+---
+
+## Support the Project
+
+If NB Feedback Kit has saved you time, solved a problem, or helped your team, I'd be incredibly grateful for your support.
+
+The best ways to support the project are:
+
+- ⭐ Star this repository
+- 🐛 Report bugs and suggest improvements
+- 📝 Improve the documentation
+- 🤝 Contribute code or examples
+- 📣 Share the project with others
+
+If you'd like to help fund continued development, you can also buy me a coffee.
+
+<a href="https://ko-fi.com/nealsch" target="_blank">
+  <img src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com" height="42">
+</a>
+
+Thank you for helping make NB Feedback Kit better.
 
 ---
 
