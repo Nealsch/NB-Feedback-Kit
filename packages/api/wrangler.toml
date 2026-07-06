@@ -28,6 +28,32 @@ binding = "API_KEYS"
 id = "b048526f0fe6404e8b25104e193aa35c"
 preview_id = "b048526f0fe6404e8b25104e193aa35c"
 
+# FEEDBACK-2: KV namespace for per-device records (registration, rate-limit,
+# revocation). Create with:
+#   wrangler kv namespace create DEVICES --env development
+#   wrangler kv namespace create DEVICES --preview --env development
+# Then paste the returned ids below.
+[[env.development.kv_namespaces]]
+binding = "DEVICES"
+id = "0533882bfd9647dc85b459ebecb8dbde"
+preview_id = "0533882bfd9647dc85b459ebecb8dbde"
+
+# FEEDBACK-1: native R2 binding for server-mediated screenshot uploads.
+# Create with: wrangler r2 bucket create spherepa-feedback-dev
+# The bucket must be publicly readable on the `feedback/` prefix for GitHub
+# to render screenshots — see CLOUDFLARE_SETUP.md §"R2 Public Read".
+[[env.development.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "spherepa-feedback-dev"
+preview_bucket_name = "spherepa-feedback-dev"
+
+# FEEDBACK-1: public base URL for objects in R2_BUCKET. Set via:
+#   wrangler secret put R2_PUBLIC_BASE_URL --env development
+# Use the R2.dev public URL for dev (https://pub-<hash>.r2.dev) or a custom
+# domain. The upload handler appends the server-generated object key.
+# [env.development.vars]
+# R2_PUBLIC_BASE_URL = "https://pub-xxxxxxxx.r2.dev"
+
 [[env.development.durable_objects.bindings]]
 name = "RATE_LIMITER"
 class_name = "RateLimiter"
@@ -46,6 +72,31 @@ name = "nb-feedback-api-prod"
 binding = "API_KEYS"
 id = "REPLACE_WITH_PROD_NAMESPACE_ID"
 preview_id = "REPLACE_WITH_PROD_NAMESPACE_ID"
+
+# FEEDBACK-2: KV namespace for per-device records (registration, rate-limit,
+# revocation). Create with:
+#   wrangler kv namespace create DEVICES --env production
+#   wrangler kv namespace create DEVICES --preview --env production
+# Then paste the returned ids below.
+[[env.production.kv_namespaces]]
+binding = "DEVICES"
+id = "REPLACE_WITH_PROD_DEVICES_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_PROD_DEVICES_PREVIEW_ID"
+
+# FEEDBACK-1: native R2 binding for server-mediated screenshot uploads.
+# Create with: wrangler r2 bucket create spherepa-feedback-prod
+# Provision before first production deploy. The bucket must be publicly
+# readable on the `feedback/` prefix for GitHub to render screenshots.
+[[env.production.r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "spherepa-feedback-prod"
+preview_bucket_name = "spherepa-feedback-prod"
+
+# FEEDBACK-1: set via `wrangler secret put R2_PUBLIC_BASE_URL --env production`.
+# Prefer a custom domain (e.g. https://cdn.spherepa.app) over the R2.dev URL
+# for production.
+# [env.production.vars]
+# R2_PUBLIC_BASE_URL = "https://cdn.spherepa.app"
 
 [[env.production.durable_objects.bindings]]
 name = "RATE_LIMITER"

@@ -56,7 +56,8 @@ function buildIssueTitle(type: string, title: string): string {
  * from decoding them and silently breaking the escaper.
  */
 const AMP = String.fromCharCode(38); // "&"
-function escapeHtml(value: string): string {
+function escapeHtml(value: string | undefined | null): string {
+  if (!value) return '';
   return value.replace(/[&"'<>]/g, (ch) => {
     if (ch === AMP) return AMP + 'amp;';
     if (ch === '"') return AMP + 'quot;';
@@ -74,6 +75,11 @@ function escapeHtml(value: string): string {
 export function buildIssueBody(payload: FeedbackPayload): string {
   const { description, metadata, type } = payload;
 
+  // FEEDBACK-4: The description is user-authored Markdown — leave it
+  // unescaped so users can include code blocks and formatting. GitHub
+  // sanitises HTML server-side (strips <script>, onclick, etc.), so the
+  // risk is limited to Markdown formatting injection, which is acceptable
+  // for an issue body.
   const sections: string[] = [`## Description\n\n${description}`];
 
   // Screenshot attachments, rendered as inline images. GitHub renders these
@@ -93,22 +99,27 @@ export function buildIssueBody(payload: FeedbackPayload): string {
     sections.push(`## Screenshots\n\n${images}`);
   }
 
+  // FEEDBACK-4: Metadata fields are system-generated values (browser, OS,
+  // version, route, etc.) — they should never contain HTML or Markdown.
+  // Escape them as defence-in-depth against a tampered client injecting
+  // formatting or HTML into the issue body. A malicious `metadata.os`
+  // like `</pre><img src=x onerror=alert(1)>` is neutralised to inert text.
   sections.push(
     '---',
     '## Metadata',
     '',
     `**Type:** ${type}`,
-    `**Application:** ${metadata.application}`,
-    `**Version:** ${metadata.version}`
+    `**Application:** ${escapeHtml(metadata.application)}`,
+    `**Version:** ${escapeHtml(metadata.version)}`
   );
 
-  if (metadata.route) sections.push(`**Route:** ${metadata.route}`);
-  if (metadata.browser) sections.push(`**Browser:** ${metadata.browser}`);
-  if (metadata.os) sections.push(`**Operating System:** ${metadata.os}`);
-  if (metadata.screenResolution) sections.push(`**Screen Resolution:** ${metadata.screenResolution}`);
-  if (metadata.userId) sections.push(`**User ID:** ${metadata.userId}`);
+  if (metadata.route) sections.push(`**Route:** ${escapeHtml(metadata.route)}`);
+  if (metadata.browser) sections.push(`**Browser:** ${escapeHtml(metadata.browser)}`);
+  if (metadata.os) sections.push(`**Operating System:** ${escapeHtml(metadata.os)}`);
+  if (metadata.screenResolution) sections.push(`**Screen Resolution:** ${escapeHtml(metadata.screenResolution)}`);
+  if (metadata.userId) sections.push(`**User ID:** ${escapeHtml(metadata.userId)}`);
 
-  sections.push(`**Timestamp:** ${metadata.timestamp}`);
+  sections.push(`**Timestamp:** ${escapeHtml(metadata.timestamp)}`);
 
   return sections.join('\n\n');
 }

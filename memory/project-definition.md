@@ -1,544 +1,255 @@
-# NB Feedback Kit
+# NB Feedback Kit — Project Definition
+
+> **Status:** Living document. This is the authoritative high-level description of the
+> NB Feedback Kit system. Update whenever architecture, endpoints, auth model, or
+> bindings change.
+
+---
 
 ## Overview
 
-NB Feedback Kit is a reusable feedback, roadmap, and release management system designed for React applications.
-
-The goal is to provide a plug-and-play solution that can be integrated into any React application with minimal configuration, enabling:
+NB Feedback Kit is a reusable feedback, roadmap, and release-management system
+designed for React and React Native applications. It lets any app install a
+single SDK / client and gain:
 
 - In-app user feedback collection
-- GitHub Issue creation
-- Product roadmap management
+- GitHub Issue creation (with optional screenshot)
+- Product roadmap display
 - Release notes display
-- Context-aware bug reporting
-- Multi-project support
+- Per-device authentication + rate limiting
+- Admin device revocation (abuse response)
+- Multi-project support (one API backs many apps)
 
-The system should be built once and reused across all future projects.
+The goal: **build once, reuse across all future projects**.
 
 ---
 
-# Vision
+## Current State (as of 2026-07-06)
 
-Instead of implementing feedback collection separately for every application, developers should be able to install a single package and configure:
+### Implemented ✅
 
-```tsx
-<FeedbackProvider
-    config={{
-        applicationName: "Student Manager",
-        version: "1.0.0",
-        targetRepository: "student-manager"
-    }}
->
-    <App />
-</FeedbackProvider>
+- **Backend API** (`packages/api`) — Cloudflare Worker + Hono.js + TypeScript
+- **Frontend SDK (React)** — `packages/react-sdk` (planned; see Future)
+- **Mobile client (React Native)** — SpherePA's `src/services/feedbackClient.ts`
+  consumes the API directly (no SDK package, by design — zero new deps)
+- **Shared types** — `packages/shared-types`
+
+#### API endpoints (all under the Worker root)
+
+| Method | Path | Auth | Purpose | Task |
+|--------|------|------|---------|------|
+| `GET` | `/` | none | API info | TASK-001 |
+| `GET` | `/health` | none | Health check | TASK-001 |
+| `POST` | `/api/feedback` | Bearer JWT *or* `X-API-Key` | Create GitHub issue | TASK-006 |
+| `GET` | `/api/releases` | Bearer JWT *or* `X-API-Key` | GitHub releases | TASK-009 |
+| `GET` | `/api/roadmap` | Bearer JWT *or* `X-API-Key` | Roadmap from labelled issues | TASK-011 |
+| `POST` | `/api/uploads` | Bearer JWT *or* `X-API-Key` | R2 server-mediated screenshot upload (mobile-preferred) | FEEDBACK-1 |
+| `POST` | `/api/uploads/presign` | Bearer JWT *or* `X-API-Key` | Legacy browser presigned-PUT flow | FEEDBACK-1 |
+| `POST` | `/api/register` | `X-API-Key` (bootstrap) | Exchange bootstrap key for per-device JWT | FEEDBACK-2 |
+| `POST` | `/api/devices/:id/revoke` | `ADMIN_TOKEN` (Bearer) | Ban a device | FEEDBACK-3 |
+| `POST` | `/api/devices/:id/activate` | `ADMIN_TOKEN` (Bearer) | Restore a banned device | FEEDBACK-3 |
+
+#### Auth model (dual-scheme, migration-safe)
+
+```
+Client                       Worker                                      KV
+  |                            |                                          |
+  |  POST /api/register        |                                          |
+  |  X-API-Key: <bootstrap>    |                                          |
+  |--------------------------->|  get(key) → config     ───────────────►  API_KEYS
+  |                            |  put(deviceId, record) ───────────────►  DEVICES
+  |  201 { token, deviceId }   |                                          |
+  |<---------------------------|                                          |
+  |                            |                                          |
+  |  POST /api/feedback        |                                          |
+  |  Authorization: Bearer JWT |                                          |
+  |--------------------------->|  verifyJWT → { deviceId }                |
+  |                            |  get(deviceId) → record ──────────────►  DEVICES
+  |                            |  if (revoked) return 403                |
+  |                            |  rate-limit by deviceId (DO)            |
+  |  201 { issueUrl }          |                                          |
+  |<---------------------------|                                          |
 ```
 
-and immediately gain:
+- **Bearer JWT** (FEEDBACK-2) — preferred path. Per-device rate limiting,
+  revocable. HS256, 7-day TTL, 5s clock-skew tolerance. Zero-dependency
+  (`src/auth/jwt.ts`, Web Crypto API).
+- **`X-API-Key`** (legacy) — retained so old binaries keep working after a
+  Worker upgrade. Per-key rate limiting. Can be rotated/revoked once all
+  clients register on launch.
+- **`ADMIN_TOKEN`** (FEEDBACK-3) — separate secret guarding device lifecycle
+  routes. Fail-closed: returns `503` if unset.
 
-- Persistent feedback button
-- Feedback modal
-- GitHub issue creation
-- Release notes viewer
-- Automatic metadata collection
+### Pending ⏳
+
+- **React SDK package** (`packages/react-sdk`) — web integration component
 
 ---
 
-# Architecture
+## Tech Stack
+
+- **Runtime:** Cloudflare Workers (edge)
+- **Framework:** Hono.js `^4.6.14`
+- **Language:** TypeScript `^5.7.2`
+- **Testing:** Vitest `^4.1.9` + `@cloudflare/vitest-pool-workers`
+- **Tooling:** Wrangler `^4.101.0`
+- **Package manager:** pnpm (workspace monorepo)
+- **Storage:** Cloudflare KV, Durable Objects, R2
+- **CI secrets:** `GITHUB_TOKEN`, `JWT_SECRET`, `ADMIN_TOKEN`, `R2_PUBLIC_BASE_URL`, `ALLOWED_ORIGINS`
+
+---
+
+## Architecture
 
 ```text
-React Application
+React / React Native App
         │
         ▼
-NB Feedback SDK
+NB Feedback SDK  (web)  |  feedbackClient.ts  (mobile — SpherePA)
         │
         ▼
-NB Feedback API
+NB Feedback API  (Cloudflare Worker + Hono)
+        │
+        ├──► KV (API_KEYS)     — bootstrap key → repo mapping
+        ├──► KV (DEVICES)      — per-device records + revocation flag
+        ├──► Durable Object    — per-device / per-key rate limiting
+        ├──► R2 (R2_BUCKET)    — screenshot storage (server-mediated)
         │
         ▼
-GitHub API
-        │
-        ▼
-Private GitHub Repository
+GitHub API  (issues, releases, roadmap)  →  Private GitHub Repository
 ```
+
+**Why Worker-mediated:** the GitHub PAT and all cloud config stay server-side.
+Clients never see credentials. The mobile upload path is same-origin (no CORS
+needed); the legacy presign path remains for browsers.
 
 ---
 
-# High-Level Components
+## Bindings Inventory
 
-## Frontend SDK
-
-Repository:
-
-```text
-nb-feedback-sdk
-```
-
-Responsibilities:
-
-- UI Components
-- Feedback collection
-- Context gathering
-- API communication
-- Release notes display
+| Binding | Type | Purpose | Required by |
+|---------|------|---------|-------------|
+| `API_KEYS` | KV Namespace | `apiKey → { repository, name }` mapping | TASK-005 |
+| `DEVICES` | KV Namespace | Per-device registration record (config snapshot, `revoked`, timestamps) | FEEDBACK-2 |
+| `RATE_LIMITER` | Durable Object | Per-key (legacy) / per-device (JWT) rate limiting | TASK-005, FEEDBACK-3 |
+| `R2_BUCKET` | R2 Bucket | Screenshot storage (`feedback/` prefix) | FEEDBACK-1 |
+| `GITHUB_TOKEN` | Secret | GitHub PAT (issues + releases read) | TASK-006 |
+| `JWT_SECRET` | Secret | HS256 signing key for device JWTs (≥ 32 bytes) | FEEDBACK-2 |
+| `ADMIN_TOKEN` | Secret | Bearer guard for `/api/devices/:id/{revoke,activate}` | FEEDBACK-3 |
+| `R2_PUBLIC_BASE_URL` | Secret / Var | Public base URL for R2 objects (GitHub image rendering) | FEEDBACK-1 |
+| `ALLOWED_ORIGINS` | Var / Secret | Comma/space-separated CORS origin allowlist (unset → `*` without credentials) | FEEDBACK-4 |
 
 ---
 
-## Backend API
-
-Repository:
-
-```text
-nb-feedback-api
-```
-
-Responsibilities:
-
-- Secure GitHub integration
-- Issue creation
-- Release retrieval
-- Repository routing
-- Authentication
-- Secret management
-
----
-
-## Shared Types
-
-Repository or package:
-
-```text
-nb-feedback-shared
-```
-
-Responsibilities:
-
-- Request types
-- Response types
-- Validation schemas
-
----
-
-# Monorepo Structure
-
-Recommended:
+## Monorepo Structure
 
 ```text
 NB-Feedback-Kit
 │
 ├── packages
+│   ├── api              ← Cloudflare Worker (Hono + TS)
+│   │   ├── src
+│   │   │   ├── index.ts             ← app, routes, middleware wiring
+│   │   │   ├── auth
+│   │   │   │   ├── jwt.ts           ← HS256 sign/verify (Web Crypto)
+│   │   │   │   └── register.ts      ← handleRegister + handleRevoke + handleActivate
+│   │   │   ├── middleware
+│   │   │   │   └── auth.ts          ← dual-scheme auth (Bearer JWT | X-API-Key)
+│   │   │   ├── github
+│   │   │   │   └── client.ts        ← GitHub REST wrapper
+│   │   │   ├── rate-limiter.ts      ← Durable Object (per-device/per-key)
+│   │   │   └── storage
+│   │   │       └── uploads.ts       ← R2 server-mediated upload handler
+│   │   ├── wrangler.toml
+│   │   ├── CLOUDFLARE_SETUP.md      ← deployment + binding setup guide
+│   │   └── api-key-value.json       ← local-dev bootstrap key (gitignored in prod)
 │   │
-│   ├── react-sdk
-│   │
-│   ├── api
-│   │
-│   └── shared-types
+│   ├── react-sdk        ← (planned) web FeedbackProvider + components
+│   └── shared-types     ← request/response TypeScript types
 │
 ├── docs
-│
 ├── examples
-│
-└── infrastructure
+└── memory
+    └── project-definition.md   ← this file
 ```
+
+> **Note:** SpherePA (sibling repo) consumes the API via
+> `src/services/feedbackClient.ts` rather than a published SDK package, to
+> avoid adding a runtime dependency to the mobile app.
 
 ---
 
-# Phase 1 — SDK Foundation
+## Security Model
 
-## Objectives
+### Principle
 
-Create reusable frontend components.
+Never expose GitHub tokens or cloud credentials to clients. All sensitive
+operations are Worker-mediated.
 
-### Components
+### Bootstrap → per-device flow
 
-#### FeedbackProvider
+1. Each app binary ships with one shared `X-API-Key` (bootstrap).
+2. On first API call, the mobile client `POST /api/register`s and receives a
+   short-lived JWT bound to a UUID `deviceId`.
+3. Subsequent calls use `Authorization: Bearer <jwt>`.
+4. Rate limiting keys by `deviceId` on the JWT path (FEEDBACK-3).
+5. A compromised device can be banned via `POST /api/devices/:id/revoke`
+   without rotating the bootstrap key for everyone.
+6. Once all clients register on launch, the bootstrap key can be retired.
 
-Responsible for:
+### Revocation enforcement (FEEDBACK-3)
 
-- Configuration
-- Context management
-- Dependency injection
+- `handleRegister` returns `403` if a revoked `deviceId` attempts re-registration.
+- `createAuthMiddleware` returns `403` on any Bearer-JWT request from a revoked
+  device.
+- Lifecycle routes are guarded by a dedicated `ADMIN_TOKEN` secret (fail-closed
+  `503` if unset) so a compromised client credential cannot self-revoke.
 
-#### FeedbackButton
+### Security hardening (FEEDBACK-4)
 
-Persistent floating button.
+- **Key hashing:** API keys are looked up in `API_KEYS` KV by their SHA-256
+  hash, not the raw key — defence-in-depth against KV namespace leaks. The
+  middleware tries the hash first, then falls back to the raw key for backward
+  compatibility with pre-FEEDBACK-4 deployments.
+- **CORS origin allowlist:** The Worker resolves `Access-Control-Allow-Origin`
+  dynamically per request from the `ALLOWED_ORIGINS` var/secret. Unset → `*`
+  **without** credentials (public mode). This fixes the previous spec-invalid
+  `origin:'*'` + `credentials:true` combination that browsers silently broke.
+- **Field-length caps:** Title, description, and metadata fields are
+  length-capped server-side to stay under GitHub's 65,536-char issue-body limit.
+- **Metadata HTML-escaping:** All metadata fields interpolated into the issue
+  body are HTML-escaped as defence-in-depth against client-side tampering. The
+  description is left unescaped because it is legitimate Markdown.
+- **Attachment validation:** Screenshot attachment arrays are rebuilt from
+  validated primitives (scheme-restricted URLs, length-capped filenames)
+  before reaching GitHub.
 
-Requirements:
+### Upload security envelope (FEEDBACK-1)
 
-- Visible throughout application
-- Position configurable
-- Non-intrusive
-- Theme aware
-
-#### FeedbackModal
-
-Fields:
-
-- Feedback Type
-- Title
-- Description
-
-Validation:
-
-- Required type
-- Required title
-- Required description
-
----
-
-# Phase 2 — Context Capture
-
-## Objectives
-
-Automatically capture useful debugging information.
-
-### Metadata
-
-Capture:
-
-- Application name
-- Application version
-- Route
-- Browser
-- Operating System
-- Device type
-- Screen resolution
-- Timestamp
-- User ID (optional)
-
-Example:
-
-```json
-{
-  "application": "Student Manager",
-  "version": "1.0.0",
-  "route": "/dashboard",
-  "browser": "Firefox",
-  "os": "Windows 11",
-  "screenResolution": "1920x1080",
-  "timestamp": "2026-06-16T12:00:00Z"
-}
-```
+| Concern | Mitigation |
+|---------|------------|
+| Size | 10 MiB hard cap, enforced before bytes touch R2 |
+| Type | Allowlist: PNG, JPEG, WebP, GIF only |
+| Spoofing | Magic-byte signature check on first 8–12 bytes |
+| Key traversal | Object keys are server-generated (`feedback/<timestamp>-<random>`) |
 
 ---
 
-# Phase 3 — API Integration
+## Testing
 
-## Objectives
-
-Create API communication layer.
-
-### Feedback Service
-
-Methods:
-
-```typescript
-submitFeedback()
-getReleaseNotes()
-getRoadmap()
-```
-
-### Payload
-
-```json
-{
-  "type": "bug",
-  "title": "Search not working",
-  "description": "Search returns no results.",
-  "metadata": {}
-}
-```
+- **Runner:** Vitest + `@cloudflare/vitest-pool-workers` (simulated KV / DO / R2).
+- **Current suite:** 114 tests across 8 files, all passing (2026-07-06).
+- **Coverage focus:** JWT sign/verify round-trip + tamper/expiry, registration
+  happy path + 401, revocation lifecycle (revoke/activate/idempotency/404/400),
+  revocation enforcement at register + auth middleware, per-device rate-limit
+  keying, R2 upload validation (size/type/magic-bytes), GitHub integration
+  error mapping (502 on bad credentials).
 
 ---
 
-# Phase 4 — Backend API
+## Configuration (consumer side)
 
-## Objectives
-
-Create secure GitHub integration service.
-
-### Endpoint
-
-#### Submit Feedback
-
-```http
-POST /feedback
-```
-
-#### Get Releases
-
-```http
-GET /releases
-```
-
-#### Get Roadmap
-
-```http
-GET /roadmap
-```
-
----
-
-# Phase 5 — GitHub Integration
-
-## Objectives
-
-Convert feedback into GitHub Issues.
-
-### Issue Title Formats
-
-Bug:
-
-```text
-[BUG] Search not working
-```
-
-Feature:
-
-```text
-[FEATURE] Add CSV export
-```
-
-Feedback:
-
-```text
-[FEEDBACK] Dashboard suggestions
-```
-
----
-
-## Issue Body Template
-
-```markdown
-## Description
-
-User supplied description
-
----
-
-## Metadata
-
-Application: Student Manager
-
-Version: 1.0.0
-
-Route: /dashboard
-
-Browser: Firefox
-
-Operating System: Windows 11
-
-Timestamp: 2026-06-16T12:00:00Z
-```
-
----
-
-# Phase 6 — GitHub Labels
-
-## Objectives
-
-Automatically apply labels.
-
-### Mapping
-
-Bug:
-
-```text
-bug
-beta-feedback
-```
-
-Feature Request:
-
-```text
-feature-request
-beta-feedback
-```
-
-General Feedback:
-
-```text
-feedback
-beta-feedback
-```
-
----
-
-# Phase 7 — Release Notes
-
-## Objectives
-
-Display GitHub release information inside applications.
-
-### Component
-
-```text
-ReleaseNotesModal
-```
-
-Accessible from:
-
-- Settings
-- About
-- What's New
-
-### Display
-
-- Version
-- Release Date
-- Release Notes
-
-Example:
-
-```text
-Version 1.3.0
-
-Added:
-- Student search
-
-Improved:
-- Dashboard performance
-
-Fixed:
-- Login crash
-```
-
----
-
-# Phase 8 — Roadmap Support
-
-## Objectives
-
-Expose roadmap information to users.
-
-### Source
-
-GitHub Issues
-
-Labels:
-
-```text
-planned
-in-progress
-testing
-released
-```
-
-### Roadmap Component
-
-Display:
-
-```text
-Planned
-In Progress
-Released
-```
-
----
-
-# Phase 9 — Screenshot Support
-
-## Objectives
-
-Allow screenshots to accompany feedback.
-
-### Requirements
-
-User can:
-
-- Upload screenshot
-- Paste screenshot
-- Drag and drop screenshot
-
-### Storage Options
-
-Option A:
-
-GitHub issue attachment
-
-Option B:
-
-Cloud object storage
-
-Examples:
-
-- S3
-- Cloudflare R2
-
-Preferred:
-
-Cloudflare R2
-
----
-
-# Phase 10 — Multi-Project Support
-
-## Objectives
-
-Support multiple applications using a single API.
-
-### SDK Configuration
-
-```typescript
-{
-  applicationName: "Student Manager",
-  version: "1.0.0",
-  targetRepository: "student-manager"
-}
-```
-
----
-
-## API Repository Routing
-
-Example:
-
-```json
-{
-  "student-manager": {
-    "owner": "nealbresler",
-    "repo": "student-manager"
-  },
-  "house-points": {
-    "owner": "nealbresler",
-    "repo": "house-points"
-  }
-}
-```
-
----
-
-# Security Requirements
-
-## Never Expose GitHub Tokens
-
-Forbidden:
-
-```text
-React App
-    ↓
-GitHub API
-```
-
-Reason:
-
-- Token exposure
-- Repository compromise
-
----
-
-## Required Architecture
-
-```text
-React App
-    ↓
-NB Feedback API
-    ↓
-GitHub API
-```
-
----
-
-# Configuration Example
+### Web (planned SDK)
 
 ```tsx
 <FeedbackProvider
@@ -546,80 +257,106 @@ GitHub API
         applicationName: "Student Manager",
         version: "1.0.0",
         targetRepository: "student-manager",
-        apiEndpoint: "https://feedback-api.domain.com"
+        apiEndpoint: "https://nb-feedback-api-prod.<subdomain>.workers.dev"
     }}
 >
     <App />
 </FeedbackProvider>
 ```
 
+### Mobile (SpherePA pattern — direct client)
+
+```ts
+// app.config.ts extra.feedback: { apiKey, apiUrl }
+// src/services/feedbackClient.ts lazily registers on first API call,
+// caches the JWT + deviceId in module memory for the session.
+```
+
+The mobile client intentionally avoids `expo-secure-store` (zero-dep policy);
+credentials live in module memory for the session and re-mint on each launch.
+
 ---
 
-# Future Enhancements
+## GitHub Integration
 
-## Feature Voting
+### Issue title formats
 
-Allow users to vote on feature requests.
+```text
+[BUG] Search not working
+[FEATURE] Add CSV export
+[FEEDBACK] Dashboard suggestions
+```
 
-Endpoints:
+### Labels
 
-```http
-POST /vote
-GET /features
+| Feedback type | Labels |
+|---------------|--------|
+| Bug | `bug`, `beta-feedback` |
+| Feature Request | `feature-request`, `beta-feedback` |
+| General Feedback | `feedback`, `beta-feedback` |
+
+### Roadmap labels
+
+`planned` · `in-progress` · `testing` · `released`
+
+### Repository routing (server-side, per API key)
+
+```json
+{
+  "spherepa":  { "owner": "Nealsch", "repo": "spherepa" },
+  "student-manager": { "owner": "nealbresler", "repo": "student-manager" }
+}
 ```
 
 ---
 
-## User Feedback Portal
-
-Allow users to:
-
-- View submitted feedback
-- Track status
-- View roadmap
-- View release history
-
----
-
-## AI Categorization
-
-Automatically classify feedback:
-
-- Bug
-- Feature Request
-- UX Issue
-- Enhancement
-
----
-
-## AI Deduplication
-
-Detect duplicate feedback before creating new issues.
-
----
-
-# Success Criteria
+## Success Criteria
 
 The project is considered successful when:
 
-1. A React application can install the SDK in under 10 minutes.
+1. A React / React Native app can integrate feedback in under 10 minutes.
 2. Feedback can be submitted without exposing GitHub credentials.
-3. Feedback automatically creates GitHub Issues.
+3. Feedback automatically creates GitHub Issues (with optional screenshot).
 4. Release notes can be displayed from GitHub Releases.
-5. Multiple applications can share the same backend API.
-6. All GitHub repositories remain private.
-7. The system is reusable across future projects without modification.
+5. Multiple applications share the same backend API.
+6. Per-device auth + rate limiting prevents one leak from blowing the budget.
+7. Admins can revoke a single abusive device without rotating keys for everyone.
+8. All GitHub repositories remain private.
+9. The system is reusable across future projects without modification.
 
 ---
 
-# Target Outcome
+## Future Enhancements
 
-A reusable, production-ready feedback platform that provides:
+- **React SDK package** — formal `packages/react-sdk` with `FeedbackProvider`,
+  `FeedbackButton`, `FeedbackModal`, `ReleaseNotesModal`.
+- **Feature voting** — `POST /vote`, `GET /features`.
+- **User feedback portal** — view submitted feedback, track status, roadmap,
+  release history.
+- **AI categorisation** — auto-classify (Bug / Feature / UX / Enhancement).
+- **AI deduplication** — detect duplicate feedback before creating new issues.
 
-- Feedback collection
-- GitHub Issue management
-- Roadmap tracking
-- Release note distribution
-- Multi-project support
+---
 
-through a single SDK and backend service that can be integrated into any future React application.
+## Decision Log Summary
+
+See `memory/project-decisions.md` for full records. Key decisions:
+
+- **Worker + Hono over Express/FaaS** — edge-deployed, KV/DO/R2 native, free
+  tier covers MVP volume.
+- **Dual-scheme auth** — Bearer JWT (FEEDBACK-2) preferred; `X-API-Key`
+  retained for migration so a Worker upgrade never breaks old binaries.
+- **In-memory JWT cache on mobile** — avoids `expo-secure-store` dependency;
+  JWT TTL (7 days) + bootstrap-key requirement keep it secure.
+- **`ADMIN_TOKEN` separate from API key / JWT** — a compromised client
+  credential cannot self-revoke or un-ban devices.
+- **Server-mediated R2 uploads for mobile** — no CORS, no presigned URLs, all
+  cloud config server-side, server-enforced size/type/magic-byte caps.
+- **SHA-256 key hashing (FEEDBACK-4)** — API keys are stored in KV under their
+  hash, not the raw key. Defence-in-depth against KV leaks; the raw-key
+  fallback is kept temporarily for migration safety.
+
+---
+
+*This document is maintained by the NB-Project-Admin skill. Update on
+architecture, endpoint, binding, or auth-model changes.*

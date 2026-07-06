@@ -10,7 +10,7 @@
 | Step 3 - In Development | 1 | |
 | Step 4 - Review | 2 | |
 | Step 5 - Testing | 2 | |
-| Step 6 - Complete | ∞ | TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013 |
+| Step 6 - Complete | ∞ | TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014 |
 
 ---
 
@@ -308,6 +308,31 @@
   - ✅ Demo app shows roadmap
 - **Record:** `.ai/tasks/items/TASK-012-roadmap-sdk.md`
 
+### TASK-014: Storage-Provider Agnosticism (S3-Compatible + CORS Guide)
+- **Status:** Complete
+- **Priority:** High
+- **Owner:** NB-Backend-Specialist + NB-Frontend-Web-Specialist
+- **Type:** Feature Development
+- **Created:** 2026-07-05
+- **Completed:** 2026-07-06
+- **Dependencies:** TASK-008
+- **Scope:** Make the feedback kit storage-provider agnostic so app developers can configure S3-compatible providers (AWS S3, Cloudflare R2, MinIO, Backblaze B2) alongside the existing `none` and `custom` providers. Cloud credentials stay server-side as Worker secrets; the SDK receives a short-lived SigV4 presigned PUT URL and uploads bytes directly to the bucket. Zero new npm dependencies.
+- **Decision:** ADR-008 (Worker-issued presigned URLs) — `memory/project-decisions.md`.
+- **Deliverables:**
+  - ✅ `packages/api/src/storage/sigv4.ts` — Zero-dep SigV4 presigned-URL signer (Web Crypto API).
+  - ✅ `packages/api/src/storage/presign.ts` — `POST /api/uploads/presign` route (auth + rate limiting + `S3_ALLOWED_BUCKETS` allowlist).
+  - ✅ `packages/api/src/storage/sigv4.test.ts` — 16 SigV4 tests.
+  - ✅ `packages/react-sdk/src/storage/providers/s3.ts` — `S3StorageProvider` (presign → PUT → `UploadedFile`).
+  - ✅ `packages/react-sdk/src/storage/types.ts` — Added `S3Config`; extended `StorageProviderConfig` union.
+  - ✅ `packages/react-sdk/src/storage/index.ts` — Added `s3` branch + `createStorageProvider`.
+  - ✅ `packages/react-sdk/src/storage/test-connection.ts` — S3 probe (presign, no bytes written).
+  - ✅ `packages/react-sdk/src/components/StorageConfigPanel.tsx` — S3 config form (bucket, region, endpoint, key prefix).
+  - ✅ `packages/shared-types/src/index.ts` — `PresignRequest` / `PresignResponse` contracts.
+  - ✅ `packages/api/S3_CORS_CONFIGURATION.md` — Operator CORS setup guide (AWS S3, R2, MinIO, B2) + public-read bucket policy + verification checklist (2026-07-06).
+  - ✅ `resources/api-reference.md` — Documented `POST /api/uploads/presign`.
+- **Test coverage:** 46/46 pass (30 existing + 16 SigV4). Typecheck passes all 4 packages.
+- **Record:** `memory/tasks/handoff-2026-07-05-storage-provider-agnostic.md`
+
 ### TASK-013: Changesets + Release Automation
 - **Status:** Complete
 - **Priority:** Medium
@@ -380,7 +405,7 @@ Tasks are organized by the 10 phases from project definition:
 | **Phase 6: GitHub Labels** | TASK-006 (included) | To Be Started |
 | **Phase 7: Release Notes** | TASK-009, TASK-010 | To Be Started |
 | **Phase 8: Roadmap** | TASK-011, TASK-012 | To Be Started |
-| **Phase 9: Screenshots** | Deferred (Future) | — |
+| **Phase 9: Screenshots** | TASK-014 | Complete |
 | **Phase 10: Multi-Project** | TASK-005, TASK-006 (included) | To Be Started |
 
 ---
@@ -389,7 +414,7 @@ Tasks are organized by the 10 phases from project definition:
 
 The following features from the project definition are deferred until post-MVP:
 
-- **Screenshot Upload** (Phase 9) — Requires Cloudflare R2 integration
+- ~~**Screenshot Upload** (Phase 9)~~ — **Delivered in TASK-014** (S3-compatible providers + presigned URLs; R2 supported via S3 API)
 - **Feature Voting** — Requires additional API endpoints and UI
 - **User Feedback Portal** — Separate web application
 - **AI Categorization** — Requires LLM integration

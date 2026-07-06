@@ -268,6 +268,36 @@ describe('Feature', () => {
   from the app's origin. This should be a setup-guide checklist item for
   every storage provider that involves direct browser uploads.
 
+## 2026-07-06: FEEDBACK-4 Security Hardening — escapeHtml Null-Safety
+
+### What Worked Well
+
+**1. Smoke Testing the Real Auth Path Caught a Unit-Test Blind Spot**
+- The `escapeHtml` function had 100% line coverage from the happy-path
+  fixtures, but every fixture supplied a complete metadata object (including
+  `timestamp`). A real client (the JWT-path smoke test) omitted `timestamp`,
+  and `undefined.replace(...)` threw a TypeError at runtime.
+- **Lesson:** Unit tests built from "complete" fixtures systematically miss
+  null/undefined edge cases. Run at least one smoke test with a *minimal*
+  payload (only the required fields) before declaring a feature done.
+
+**2. Null-Safe Escapers Are a One-Line Fix That Prevents a Class of Crashes**
+- Widening the signature to `string | undefined | null` and returning `''`
+  for falsy values made every caller safe without touching them.
+- **Lesson:** When a pure utility is fed external/optional data, treat
+  `undefined`/`null` as a first-class input — never assume the caller
+  validates first.
+
+### What Caused Friction
+
+**1. The Bug Only Surfaced After Deployment**
+- The local test suite passed because every fixture supplied `timestamp`.
+  The crash only appeared when the deployed Worker received a minimal JWT
+  payload from the smoke test.
+- **Lesson:** Unit tests are necessary but not sufficient for optional-field
+  robustness. A "minimal payload" smoke test (smallest valid request) is a
+  cheap complement to full-fixture unit tests.
+
 ---
 
 ## Summary

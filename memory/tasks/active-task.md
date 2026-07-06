@@ -1,12 +1,49 @@
 # Active Task
 
 ## Current
-**Session Closed** — 2026-07-05, 22:15 PM
+**Session In Progress** — 2026-07-06, 09:50 AM
 
-Storage-provider agnosticism implemented and verified — the feedback kit now
-supports S3-compatible providers (AWS S3, Cloudflare R2, MinIO, Backblaze B2)
-alongside the existing `none` and `custom` providers, using Worker-issued
-presigned URLs so cloud credentials never reach the browser.
+Follow-up documentation task for the storage-provider agnosticism work. Wrote
+a comprehensive CORS configuration guide (`packages/api/S3_CORS_CONFIGURATION.md`)
+that operators deploy S3-compatible providers (AWS S3, Cloudflare R2, MinIO,
+Backblaze B2) will need to configure on their buckets. Resolved open item #4
+(CORS documentation) from the 2026-07-05 session.
+
+---
+
+## Session Summary — 2026-07-06
+
+### Objective
+Resolve open item #4 from the 2026-07-05 handoff: "Operators using the S3
+provider must configure CORS on their bucket to allow PUT from the app's
+origin. Document this in a setup guide."
+
+### Completed Today
+
+**S3 CORS configuration guide** ✅
+- **Created:** `packages/api/S3_CORS_CONFIGURATION.md` — comprehensive operator guide covering:
+  - Why CORS is required (two-step browser-direct upload flow diagram).
+  - What the bucket must allow (`PUT`, `Content-Type`, app origins, expose `ETag`).
+  - Provider-specific setup: AWS S3 (Console + CLI), Cloudflare R2 (Dashboard + S3 API), MinIO (env vars + `mc`), Backblaze B2.
+  - Verification checklist (secrets, test connection, DevTools network trace).
+  - Common failure modes table (CORS errors, 403 forbidden, broken images).
+  - Public read access policy (required for issue rendering — ADR-008 trade-off).
+  - Security checklist (dedicated bucket, scoped public read, minimal methods/headers).
+- **Verified:** R2 CORS schema against Cloudflare skill reference (S3-compatible `CORSRules` format, not custom `Allowed` wrapper).
+- **Test results:** 46/46 tests pass, 4/4 typechecks pass — no regressions (documentation-only change).
+
+### Files Created Today
+```
+packages/api/S3_CORS_CONFIGURATION.md
+```
+
+### Files Modified Today
+```
+memory/tasks/active-task.md
+memory/tasks/project-board.md
+```
+
+---
 
 ## Session Summary — 2026-07-05
 
@@ -106,11 +143,10 @@ API only.
    but the `POST /api/uploads/presign` route handler itself (auth, allowlist,
    400/403/500 paths) has no dedicated integration test yet.
 3. **SDK provider test** — `S3StorageProvider` has no unit test (fetch mock).
-4. **CORS configuration** — Operators using the S3 provider must configure
-   CORS on their bucket to allow PUT from the app's origin. Document this in
-   a setup guide.
+4. ✅ **CORS configuration** — Resolved 2026-07-06. See
+   `packages/api/S3_CORS_CONFIGURATION.md`.
 5. **wrangler.toml** — Confirm whether the new `S3_*` secrets need to be
    declared in `wrangler.toml` for local dev (they are read via `env`).
 
 ## Last Updated
-2026-07-05, 22:15 PM
+2026-07-06, 09:50 AM
