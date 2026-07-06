@@ -31,7 +31,8 @@ using *your* GitHub, *your* storage, and *your* infrastructure.
   <a href="#features"><strong>Features</strong></a> &nbsp;·&nbsp;
   <a href="#quick-start"><strong>Quick Start</strong></a> &nbsp;·&nbsp;
   <a href="#documentation"><strong>Docs</strong></a> &nbsp;·&nbsp;
-  <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
+  <a href="CONTRIBUTING.md"><strong>Contribute</strong></a> &nbsp;·&nbsp;
+  <a href="docs/about-me.md"><strong>About</strong></a>
 </p>
 
 ---
