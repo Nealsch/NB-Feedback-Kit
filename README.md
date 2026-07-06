@@ -1,26 +1,38 @@
 <div align="center">
 
-<img src="assets/NBFeedbackKit_Logo_Transparent.png" width="140" alt="NB Feedback Kit logo" />
+<img src="assets/FeedbackKitBanner.png" alt="NB Feedback Kit — GitHub-native feedback infrastructure" width="860" />
 
 # NB Feedback Kit
 
 **Secure, GitHub-native feedback infrastructure for React & React Native.**
 
-In-app feedback, screenshots, issues, roadmaps, and release notes — using *your* GitHub, *your* storage, and *your* infrastructure.
+Collect in-app feedback, screenshots, issues, roadmaps, and release notes —
+using *your* GitHub, *your* storage, and *your* infrastructure.
 
 [![License: MIT][license]](LICENSE)
-[![Latest Release][release]](https://github.com/Nealsch/nb-feedback-kit/releases/latest)
-[![GitHub Stars][stars]](https://github.com/Nealsch/nb-feedback-kit/stargazers)
-[![Forks][forks]](https://github.com/Nealsch/nb-feedback-kit/network/members)
+[![Latest Release][release]](https://github.com/Nealsch/NB-Feedback-Kit/releases/latest)
+[![GitHub Stars][stars]](https://github.com/Nealsch/NB-Feedback-Kit/stargazers)
+[![Forks][forks]](https://github.com/Nealsch/NB-Feedback-Kit/network/members)
 
-[![npm version][npm]](https://www.npmjs.com/package/nb-feedback-kit)
-[![Downloads][downloads]](https://www.npmjs.com/package/nb-feedback-kit)
+[![npm version][npm]](https://www.npmjs.com/package/@nb-feedback-kit/react-sdk)
+[![Downloads][downloads]](https://www.npmjs.com/package/@nb-feedback-kit/react-sdk)
 [![TypeScript][ts]](https://www.typescriptlang.org/)
 [![React][react]](https://react.dev/)
 [![React Native][rn]](https://reactnative.dev/)
-[![Build Status][build]](https://github.com/Nealsch/nb-feedback-kit/actions/workflows/ci.yml)
+[![Build Status][build]](https://github.com/Nealsch/NB-Feedback-Kit/actions/workflows/ci.yml)
 
 </div>
+
+---
+
+<p align="center">
+  <a href="#why-nb-feedback-kit"><strong>Why</strong></a> &nbsp;·&nbsp;
+  <a href="#architecture"><strong>Architecture</strong></a> &nbsp;·&nbsp;
+  <a href="#features"><strong>Features</strong></a> &nbsp;·&nbsp;
+  <a href="#quick-start"><strong>Quick Start</strong></a> &nbsp;·&nbsp;
+  <a href="#documentation"><strong>Docs</strong></a> &nbsp;·&nbsp;
+  <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
+</p>
 
 ---
 
@@ -30,30 +42,17 @@ In-app feedback, screenshots, issues, roadmaps, and release notes — using *you
 
 ---
 
-<p align="center">
-  <a href="#quick-start"><strong>Quick Start</strong></a> &nbsp;·&nbsp;
-  <a href="#features"><strong>Features</strong></a> &nbsp;·&nbsp;
-  <a href="#architecture"><strong>Architecture</strong></a> &nbsp;·&nbsp;
-  <a href="#documentation"><strong>Docs</strong></a> &nbsp;·&nbsp;
-  <a href="CONTRIBUTING.md"><strong>Contribute</strong></a>
-</p>
-
----
-
-<p align="center">
-  <img src="assets/FeedbackKitBanner.png" alt="NB Feedback Kit — the complete feedback ecosystem" width="860" />
-</p>
-
----
-
 ## Why NB Feedback Kit?
 
-Building feedback into an app usually forces a hard choice:
+Most feedback platforms demand another SaaS account, another dashboard, and another database — then duplicate the workflow your team already runs in GitHub.
 
-1. **Build it yourself** — significant engineering effort and ongoing maintenance.
-2. **Adopt a hosted SaaS** — recurring costs, a duplicate workflow, another user account, and your product data living in someone else's infrastructure.
+**NB Feedback Kit takes a different path.** It lets developers collect feedback using the infrastructure they already own.
 
-NB Feedback Kit is a third option: **reusable, open infrastructure that extends the tools you already use.** You keep GitHub as the system of record, keep screenshots in your own object storage, and keep the backend on infrastructure you own. No proprietary platform, no data export, no lock-in.
+- <img src="assets/icons/folder-git-2.svg" width="16" /> &nbsp;**GitHub-native** — feedback becomes GitHub Issues, releases, and labels.
+- <img src="assets/icons/database.svg" width="16" /> &nbsp;**Your repository** — GitHub stays the single source of truth.
+- <img src="assets/icons/cloud.svg" width="16" /> &nbsp;**Your storage** — screenshots live in your own S3-compatible bucket.
+- <img src="assets/icons/server.svg" width="16" /> &nbsp;**Your infrastructure** — the backend runs where you run it.
+- <img src="assets/icons/shield-check.svg" width="16" /> &nbsp;**No vendor lock-in** — open source, self-hosted, portable.
 
 | Capability | <img src="assets/icons/folder-git-2.svg" width="16" /> &nbsp;NB Feedback Kit | Hosted SaaS | DIY build |
 |---|:--:|:--:|:--:|
@@ -63,6 +62,23 @@ NB Feedback Kit is a third option: **reusable, open infrastructure that extends 
 | Vendor neutral | <img src="assets/icons/check.svg" width="16" /> | — | <img src="assets/icons/check.svg" width="16" /> |
 | Setup in minutes | <img src="assets/icons/check.svg" width="16" /> | <img src="assets/icons/check.svg" width="16" /> | — |
 | No per-seat pricing | <img src="assets/icons/check.svg" width="16" /> | — | <img src="assets/icons/check.svg" width="16" /> |
+
+---
+
+## Architecture
+
+<p align="center">
+  <img src="assets/Architecture_Diagram.png" alt="NB Feedback Kit high-level architecture" width="820" />
+</p>
+
+NB Feedback Kit is a thin **bridge**, not a replacement for your tools.
+
+1. **Your app** (React or React Native) embeds the SDK.
+2. The **SDK** talks only to your **NB Feedback backend**.
+3. The backend creates **GitHub Issues** and reads Releases, labels, and milestones for the roadmap.
+4. Screenshots are streamed to **your S3-compatible object storage**.
+
+Credentials for GitHub and storage never leave the backend, and the client is never trusted with them.
 
 ---
 
@@ -82,23 +98,6 @@ NB Feedback Kit is a third option: **reusable, open infrastructure that extends 
 | <img src="assets/icons/smartphone.svg" width="20" /> | **React Native** | Same SDK model for React Native on iOS and Android. |
 | <img src="assets/icons/server.svg" width="20" /> | **Self Hosted** | Deploy the backend anywhere — your laptop, a VPS, or the cloud. |
 | <img src="assets/icons/heart.svg" width="20" /> | **Open Source** | MIT-licensed, transparent, and built for contributions. |
-
----
-
-## Architecture
-
-<p align="center">
-  <img src="assets/Architecture_Diagram.png" alt="NB Feedback Kit high-level architecture" width="820" />
-</p>
-
-NB Feedback Kit is a thin **bridge**, not a replacement for your tools.
-
-1. **Your app** (React or React Native) embeds the SDK.
-2. The **SDK** talks only to your **NB Feedback backend**.
-3. The backend creates **GitHub Issues** and reads Releases, labels, and milestones for the roadmap.
-4. Screenshots are streamed to **your S3-compatible object storage**.
-
-Credentials for GitHub and storage never leave the backend, and the client is never trusted with them.
 
 ---
 
@@ -158,59 +157,64 @@ Install the SDK with your preferred package manager:
 
 ```bash
 # npm
-npm install nb-feedback-kit
+npm install @nb-feedback-kit/react-sdk
 
 # pnpm
-pnpm add nb-feedback-kit
+pnpm add @nb-feedback-kit/react-sdk
 
 # yarn
-yarn add nb-feedback-kit
+yarn add @nb-feedback-kit/react-sdk
 
 # bun
-bun add nb-feedback-kit
+bun add @nb-feedback-kit/react-sdk
 ```
 
-> The backend is a separate, self-hostable service. See [Backend deployment](docs/backend.md) for deployment options.
+> **Peer dependencies:** React & React DOM `^18.0.0`. The backend is a separate, self-hostable Cloudflare Worker — see the [Getting Started guide](docs/getting-started.md) for full deployment steps.
 
 ---
 
 ## Quick Start
 
-The shortest path to live feedback — under five minutes.
+The shortest path to live feedback — under five minutes. For the complete walkthrough (backend deployment, KV setup, secrets, API-key registration), see the **[Getting Started guide](docs/getting-started.md)**.
 
-### 1. Configure the backend
+### 1. Wrap your app
 
-Deploy the backend and provide your GitHub token and S3-compatible storage credentials as environment variables. The SDK only needs the backend URL.
-
-```bash
-# backend environment
-GITHUB_TOKEN=ghp_your_token
-S3_ENDPOINT=https://your-storage.example.com
-S3_ACCESS_KEY_ID=your_access_key
-S3_SECRET_ACCESS_KEY=your_secret_key
-S3_BUCKET=feedback-screenshots
-```
-
-### 2. Wrap your React app
+The `FeedbackProvider` accepts a single `config` object:
 
 ```tsx
-import { FeedbackProvider, FeedbackButton } from 'nb-feedback-kit'
+import { FeedbackProvider, FeedbackButton, FeedbackModal } from '@nb-feedback-kit/react-sdk'
+import { useState } from 'react'
 
 export default function App() {
+  const [isOpen, setIsOpen] = useState(false)
+
   return (
-    <FeedbackProvider backendUrl="https://feedback.example.com" projectId="my-app">
+    <FeedbackProvider
+      config={{
+        applicationName: 'My App',                                  // shown in the GitHub issue
+        version: '1.0.0',                                           // captured in metadata
+        apiEndpoint: 'https://nb-feedback-api-prod.your-subdomain.workers.dev',
+        apiKey: 'your-api-key',                                     // registered in your Worker's KV
+        userId: 'optional-user-id',                                 // optional, for tracing
+      }}
+    >
       <YourApp />
-      <FeedbackButton />
+      <FeedbackButton onClick={() => setIsOpen(true)}>Feedback</FeedbackButton>
+      <FeedbackModal isOpen={isOpen} onClose={() => setIsOpen(false)} />
     </FeedbackProvider>
   )
 }
 ```
 
-### 3. Collect feedback
+### 2. Collect feedback
 
-That's it. The `<FeedbackButton />` opens the dialog, collects the message and optional screenshot, and creates a GitHub Issue on your repository — all without exposing any credentials to the client.
+That's it. The `<FeedbackButton />` opens the dialog, collects the message and optional screenshot, and the SDK posts to your Worker — which creates a **GitHub Issue** with the correct label (`bug`, `feature`, or `feedback`) and a rendered metadata table. No credentials ever reach the client.
 
-React Native follows the same model via the `FeedbackProvider`. See the [React](docs/react.md) and [React Native](docs/react-native.md) guides for hooks, custom UI, and advanced configuration.
+### 3. (Optional) Add screenshots & release notes
+
+Configure S3-compatible storage for screenshots, and surface GitHub Releases and roadmap items back to your users. See the **[Getting Started guide](docs/getting-started.md)** and [Storage Providers](docs/storage-providers.md) for details.
+
+React Native follows the same `FeedbackProvider` model. See the [React](docs/react.md) and [React Native](docs/react-native.md) guides for hooks, custom UI, and advanced configuration.
 
 ---
 
@@ -264,15 +268,17 @@ NB Feedback Kit is released under the **[MIT License](LICENSE)**.
   <sub>Built with care for developers who want to own their feedback.</sub>
 </p>
 
-<!-- Badge references (kept here so the hero stays scannable) -->
+<!-- Dynamic badge references (kept here so the hero stays scannable).
+     These shields.io badges resolve automatically once the repo is public
+     and packages/releases/CI exist; "repo not found" is expected pre-launch. -->
 
 [license]: https://img.shields.io/badge/license-MIT-orange?style=flat-square
-[release]: https://img.shields.io/github/v/release/Nealsch/nb-feedback-kit?style=flat-square&color=f97316
-[stars]: https://img.shields.io/github/stars/Nealsch/nb-feedback-kit?style=flat-square&color=f97316
-[forks]: https://img.shields.io/github/forks/Nealsch/nb-feedback-kit?style=flat-square&color=f97316
-[npm]: https://img.shields.io/npm/v/nb-feedback-kit?style=flat-square&color=f97316
-[downloads]: https://img.shields.io/npm/dm/nb-feedback-kit?style=flat-square&color=f97316
+[release]: https://img.shields.io/github/v/release/Nealsch/NB-Feedback-Kit?style=flat-square&color=f97316
+[stars]: https://img.shields.io/github/stars/Nealsch/NB-Feedback-Kit?style=flat-square&color=f97316
+[forks]: https://img.shields.io/github/forks/Nealsch/NB-Feedback-Kit?style=flat-square&color=f97316
+[npm]: https://img.shields.io/npm/v/@nb-feedback-kit/react-sdk?style=flat-square&color=f97316
+[downloads]: https://img.shields.io/npm/dm/@nb-feedback-kit/react-sdk?style=flat-square&color=f97316
 [ts]: https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white
 [react]: https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black
 [rn]: https://img.shields.io/badge/React_Native-61DAFB?style=flat-square&logo=react&logoColor=black
-[build]: https://img.shields.io/github/actions/workflow/status/Nealsch/nb-feedback-kit/ci.yml?style=flat-square&branch=main
+[build]: https://img.shields.io/github/actions/workflow/status/Nealsch/NB-Feedback-Kit/ci.yml?style=flat-square&branch=main
