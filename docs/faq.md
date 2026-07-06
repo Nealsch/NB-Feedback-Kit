@@ -195,6 +195,6 @@ You can support the project by:
 
 If you'd like to help support the continued development of NB Feedback Kit, you can buy me a coffee:
 
-**Ko-fi:** https://ko-fi.com/nealsch
+<a href='https://ko-fi.com/P4A122PD5F' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 Donations are appreciated but never expected. The project is open source, and it stays that way regardless.

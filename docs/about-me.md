@@ -83,6 +83,8 @@ NB Feedback Kit is built and maintained by a single independent developer.
 
 If this project saves you time or helps you build better software, consider starring the repository or buying me a coffee. Your support helps me dedicate more time to improving the project and building new open-source tools.
 
+<a href='https://ko-fi.com/P4A122PD5F' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+
 Thank you for taking a look.
 
 — Neal
