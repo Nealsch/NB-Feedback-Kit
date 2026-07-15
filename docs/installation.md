@@ -8,13 +8,14 @@
 
 ---
 
-## Two Ways to Install
+## Three Ways to Install
 
-Most developers only need the SDK. If you're self-hosting the backend, you'll clone the full monorepo.
+Most developers only need an SDK. Choose the one that matches your frontend. If you're self-hosting the backend, you'll clone the full monorepo.
 
 | | What | Audience | Steps |
 |:--:|---|---|---|
-| <img src="../assets/icons/download.svg" width="20" /> | **Install the SDK** | App developers embedding feedback into a React or React Native app | [Step 1](#1-install-the-sdk) below |
+| <img src="../assets/icons/atom.svg" width="20" /> | **React SDK** | App developers embedding feedback into a React 18+ or React Native app | [Step 1A](#1a-react--react-native) below |
+| <img src="../assets/icons/code.svg" width="20" /> | **Core SDK (Vanilla JS)** | Developers adding feedback to an HTML site, static site, or any non-React project | [Step 1B](#1b-vanilla-js--html) below |
 | <img src="../assets/icons/server.svg" width="20" /> | **Self-host the backend** | Developers running their own Cloudflare Worker | [Backend setup](#self-host-the-backend) below |
 
 > **New here?** Start with the **[Getting Started guide](getting-started.md)** — it walks through both the SDK and backend end-to-end.
@@ -25,6 +26,8 @@ Most developers only need the SDK. If you're self-hosting the backend, you'll cl
 
 Before installing, make sure your environment meets the baseline:
 
+### React SDK
+
 | Requirement | Minimum version | Check |
 |---|:--:|---|
 | <img src="../assets/icons/atom.svg" width="16" /> &nbsp;React | `18.0.0` | `npm ls react` |
@@ -34,11 +37,20 @@ Before installing, make sure your environment meets the baseline:
 
 > **React Native?** The SDK works with React Native `^0.72` (which ships React 18). No `react-dom` dependency is pulled into native bundles — the SDK's components are headless and DOM-agnostic.
 
+### Core SDK (Vanilla JS / HTML)
+
+| Requirement | Minimum version | Check |
+|---|:--:|---|
+| <img src="../assets/icons/terminal.svg" width="16" /> &nbsp;Node.js | `18.0.0` (build only) | `node --version` |
+| <img src="../assets/icons/globe.svg" width="16" /> &nbsp;Modern browser | ES2020+ | Any browser released after 2020 |
+
+> **No bundler required.** The Core SDK ships a pre-built IIFE bundle (`dist/index.global.js`) that you load with a `<script>` tag. No npm, no webpack, no React — just a single file.
+
 ---
 
-## 1. Install the SDK
+## 1A. React / React Native
 
-The SDK is published as a scoped package: **`@nb-feedback-kit/react-sdk`**.
+The React SDK is published as a scoped package: **`@nb-feedback-kit/react-sdk`**.
 
 Choose your preferred package manager:
 
@@ -69,6 +81,50 @@ bun add @nb-feedback-kit/react-sdk
 ```
 
 That's it. The SDK has **zero runtime dependencies** beyond `react`, `react-dom`, and `@nb-feedback-kit/shared-types` (a tiny types-only package).
+
+---
+
+## 1B. Vanilla JS / HTML
+
+The Core SDK is published as **`@nb-feedback-kit/core-sdk`**. It is framework-agnostic and works with any frontend — vanilla JS, Eleventy, Svelte, Vue, Angular, or plain HTML.
+
+### Option 1: Package manager
+
+```bash
+npm install @nb-feedback-kit/core-sdk
+```
+
+Then import in your build:
+
+```js
+import { createFeedbackClient } from '@nb-feedback-kit/core-sdk'
+```
+
+### Option 2: Script tag (IIFE global — no bundler)
+
+Download the pre-built IIFE bundle from `dist/index.global.js` and include it via a `<script>` tag. This exposes the global `window.NbFeedbackKit`:
+
+```html
+<script src="/assets/js/nb-feedback-kit.global.js"></script>
+<script>
+  const client = NbFeedbackKit.createFeedbackClient({
+    applicationName: 'My Site',
+    version: '1.0.0',
+    apiEndpoint: 'https://nb-feedback-api-prod.your-subdomain.workers.dev',
+    apiKey: 'your-api-key',
+  })
+</script>
+```
+
+The Core SDK has **zero runtime dependencies** — only `@nb-feedback-kit/shared-types` (a tiny types-only package).
+
+### Module formats
+
+| Format | File | Use when |
+|---|---|---|
+| IIFE (global) | `dist/index.global.js` | Static sites, no bundler, `<script>` tag |
+| ESM | `dist/index.mjs` | `import` in a bundler (webpack, Vite, Rollup) |
+| CJS | `dist/index.js` | `require()` in Node.js or legacy bundlers |
 
 ---
 
@@ -191,7 +247,8 @@ NB-Feedback-Kit/
 
 | Workspace package | Published? | Purpose |
 |---|:--:|---|
-| `@nb-feedback-kit/react-sdk` | <img src="../assets/icons/check.svg" width="14" /> &nbsp;Public | SDK installed by app developers |
+| `@nb-feedback-kit/react-sdk` | <img src="../assets/icons/check.svg" width="14" /> &nbsp;Public | React SDK installed by app developers |
+| `@nb-feedback-kit/core-sdk` | <img src="../assets/icons/check.svg" width="14" /> &nbsp;Public | Framework-agnostic SDK (vanilla JS, HTML) |
 | `@nb-feedback-kit/shared-types` | <img src="../assets/icons/check.svg" width="14" /> &nbsp;Public | Shared types (auto-installed as a dep) |
 | `@nb-feedback-kit/api` | — &nbsp;Private | Worker backend (deploy from source) |
 
@@ -234,6 +291,8 @@ For libraries wrapping the SDK, use a range:
 | Symptom | Cause | Fix |
 |---|---|---|
 | `Cannot find module '@nb-feedback-kit/react-sdk'` | Package not installed, or build cache stale | Run your package manager's install command again. If building from source, run `pnpm turbo run build`. |
+| `Cannot find module '@nb-feedback-kit/core-sdk'` | Core SDK not installed or not built | Run `npm install @nb-feedback-kit/core-sdk`. If building from source, run `pnpm turbo run build`. |
+| `NbFeedbackKit is not defined` (browser console) | IIFE script not loaded, or loaded after your widget script | Ensure the `<script src="...global.js">` tag appears **before** your widget script. |
 | `peer/react: not found` warning | React not installed, or version `< 18` | Install React 18: `npm install react@^18 react-dom@^18`. |
 | Hooks error: "Invalid hook call" | Two copies of React bundled | Check for nested `node_modules/react` — dedupe with `npm dedupe` or remove lockfile and reinstall. |
 | TypeScript: cannot find type declarations | Editor using stale TS server | Restart your editor / TS server. Types are bundled in `dist/index.d.ts`. |
@@ -263,6 +322,7 @@ Then follow the **[Quick Start](getting-started.md#step-3--wrap-your-app)** to w
 - <img src="../assets/icons/rocket.svg" width="16" /> &nbsp;**[Getting Started](getting-started.md)** — End-to-end integration walkthrough.
 - <img src="../assets/icons/atom.svg" width="16" /> &nbsp;**[React Guide](react.md)** — Provider, hooks, and headless components.
 - <img src="../assets/icons/smartphone.svg" width="16" /> &nbsp;**[React Native Guide](react-native.md)** — Mobile integration.
+- <img src="../assets/icons/code.svg" width="16" /> &nbsp;**[HTML / Vanilla JS Guide](html.md)** — Script-tag integration for static sites.
 - <img src="../assets/icons/server.svg" width="16" /> &nbsp;**[Backend Guide](backend.md)** — Full Worker deployment reference.
 
 ---

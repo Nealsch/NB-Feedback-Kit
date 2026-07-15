@@ -1,0 +1,38 @@
+{
+  "name": "@nb-feedback-kit/core-sdk",
+  "version": "0.0.1",
+  "description": "Framework-agnostic JavaScript SDK for NB Feedback Kit — works with any frontend (vanilla JS, Vue, Svelte, Angular, Eleventy, etc.)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "browser": "./dist/index.global.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/index.global.js",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm,iife --dts --global-name NbFeedbackKit",
+    "dev": "tsup src/index.ts --format cjs,esm,iife --dts --global-name NbFeedbackKit --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@nb-feedback-kit/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.9"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

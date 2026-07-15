@@ -70,8 +70,8 @@ name = "nb-feedback-api-prod"
 
 [[env.production.kv_namespaces]]
 binding = "API_KEYS"
-id = "REPLACE_WITH_PROD_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_PROD_NAMESPACE_ID"
+id = "c9b3f6f6b38040cfa37f23c49f26f29b"
+preview_id = "c9b3f6f6b38040cfa37f23c49f26f29b"
 
 # FEEDBACK-2: KV namespace for per-device records (registration, rate-limit,
 # revocation). Create with:
@@ -80,8 +80,8 @@ preview_id = "REPLACE_WITH_PROD_NAMESPACE_ID"
 # Then paste the returned ids below.
 [[env.production.kv_namespaces]]
 binding = "DEVICES"
-id = "REPLACE_WITH_PROD_DEVICES_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_PROD_DEVICES_PREVIEW_ID"
+id = "81de7b2caa8149db9c6db782148faa64"
+preview_id = "81de7b2caa8149db9c6db782148faa64"
 
 # FEEDBACK-1: native R2 binding for server-mediated screenshot uploads.
 # Create with: wrangler r2 bucket create spherepa-feedback-prod
@@ -106,7 +106,9 @@ class_name = "RateLimiter"
 tag = "v1"
 new_sqlite_classes = ["RateLimiter"]
 
-# GitHub PAT stored as Cloudflare Worker secret (set via wrangler secret put)
-# Required for TASK-006: GitHub Integration Layer
-# [secrets]
-# GITHUB_TOKEN = "<set-via-wrangler-secret-put>"
+# GitHub authentication stored as Cloudflare Worker secrets (set via
+# `wrangler secret put --env <env>`). Two schemes are supported:
+#   1. GitHub App (recommended): GITHUB_APP_ID + GITHUB_APP_PRIVATE_KEY
+#   2. GitHub PAT (legacy fallback): GITHUB_TOKEN
+# See docs/installation.md §2.4 and docs/security.md §"Boundary 2" for details.
+# Secrets are never committed — they live encrypted in Cloudflare's infrastructure.

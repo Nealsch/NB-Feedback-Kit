@@ -15,7 +15,7 @@ Before you begin, make sure you have the following:
 - <img src="../assets/icons/folder-git-2.svg" width="16" /> &nbsp;**A GitHub repository** where feedback will be created as Issues.
 - <img src="../assets/icons/key-round.svg" width="16" /> &nbsp;**A GitHub Personal Access Token** with `issues: write` and `contents: read` scopes.
 - <img src="../assets/icons/server.svg" width="16" /> &nbsp;**A Cloudflare account** (free tier works) to deploy the Worker backend.
-- <img src="../assets/icons/atom.svg" width="16" /> &nbsp;**A React 18+ or React Native app** where you'll embed the SDK.
+- <img src="../assets/icons/atom.svg" width="16" /> &nbsp;**A React 18+ / React Native app** OR **any HTML site** where you'll embed the SDK.
 - <img src="../assets/icons/terminal.svg" width="16" /> &nbsp;**Node.js 18+** and **pnpm** installed locally.
 
 > **New to pnpm?** Install it with `npm install -g pnpm`. NB Feedback Kit uses pnpm workspaces for its monorepo.
@@ -29,7 +29,8 @@ NB Feedback Kit has three pieces. You'll set them up in order:
 | | Component | What it does |
 |:--:|---|---|
 | <img src="../assets/icons/server.svg" width="20" /> | **Backend Worker** | Receives feedback, creates GitHub Issues, enforces auth and rate limits. |
-| <img src="../assets/icons/atom.svg" width="20" /> | **React SDK** | Embeds in your app — provider, hooks, and UI components. |
+| <img src="../assets/icons/atom.svg" width="20" /> | **React SDK** | Embeds in your React or React Native app — provider, hooks, and UI components. |
+| <img src="../assets/icons/code.svg" width="20" /> | **Core SDK** | Framework-agnostic SDK for vanilla JS / HTML sites — a single `<script>` tag. |
 | <img src="../assets/icons/folder-git-2.svg" width="20" /> | **GitHub Repository** | The single source of truth where issues, releases, and roadmap live. |
 
 ```
@@ -112,7 +113,7 @@ curl https://nb-feedback-api-prod.<your-subdomain>.workers.dev/health
 
 ## Step 2 — Install the SDK
 
-In your React or React Native app:
+**React / React Native:**
 
 ```bash
 # npm
@@ -128,11 +129,21 @@ yarn add @nb-feedback-kit/react-sdk
 bun add @nb-feedback-kit/react-sdk
 ```
 
-> **Peer dependencies:** The SDK requires `react` and `react-dom` `^18.0.0`.
+> **Peer dependencies:** The React SDK requires `react` and `react-dom` `^18.0.0`.
+
+**Vanilla JS / HTML:**
+
+```bash
+npm install @nb-feedback-kit/core-sdk
+```
+
+Or skip npm entirely — download the pre-built IIFE bundle (`dist/index.global.js`) and load it with a `<script>` tag. See the [HTML / Vanilla JS guide](html.md) for details.
 
 ---
 
 ## Step 3 — Wrap Your App
+
+> **Using vanilla JS / HTML instead of React?** Skip to the [HTML Quick Start](#step-3b--html--vanilla-js-quick-start) below — you'll use `createFeedbackClient()` instead of `<FeedbackProvider>`.
 
 Import the `FeedbackProvider` and wrap your application root. The provider accepts a single `config` object:
 
@@ -178,6 +189,51 @@ export default function App() {
 | `apiKey` | `string` | <img src="../assets/icons/check.svg" width="14" /> | The raw API key you registered in KV. |
 | `userId` | `string` | | Optional identifier for tracing submissions to users. |
 | `storage` | `StorageProviderConfig` | | Optional screenshot storage config. Omit or set to `{ type: 'none' }` to disable. |
+
+---
+
+## Step 3B — HTML / Vanilla JS Quick Start
+
+For static sites, server-rendered pages, or any project without a React bundler, use the Core SDK's IIFE global build. No `npm install` required if you use the pre-built bundle.
+
+### 3B.1 Load the SDK
+
+```html
+<!-- Load the Core SDK (IIFE global build) -->
+<script src="/assets/js/nb-feedback-kit.global.js"></script>
+```
+
+### 3B.2 Create the client
+
+In your own widget script (loaded **after** the SDK):
+
+```js
+// feedback-widget.js
+const client = NbFeedbackKit.createFeedbackClient({
+  applicationName: 'My Site',
+  version: '1.0.0',
+  apiEndpoint: 'https://nb-feedback-api-prod.your-subdomain.workers.dev',
+  apiKey: 'your-raw-api-key',
+})
+```
+
+### 3B.3 Build your UI
+
+The Core SDK is headless — it provides the `submitFeedback()` API, but you build the button and modal yourself in vanilla JS:
+
+```js
+const btn = document.getElementById('feedback-button')
+btn.addEventListener('click', async () => {
+  const result = await client.submitFeedback({
+    type: 'bug',           // 'bug' | 'feature' | 'feedback'
+    title: 'Something broke',
+    description: 'Steps to reproduce...',
+  })
+  console.log('Issue created:', result.issueUrl)
+})
+```
+
+See the [HTML / Vanilla JS guide](html.md) for a complete widget example with modal, form validation, and error handling.
 
 ---
 
@@ -284,7 +340,7 @@ function App() {
 
 ## Verify It Works
 
-Submit a test feedback from your app, then check your GitHub repository — you should see a new Issue with:
+Submit a test feedback from your app or site, then check your GitHub repository — you should see a new Issue with:
 
 - The correct label (`bug`, `feature`, or `feedback`).
 - A rendered metadata table (app name, version, browser, OS, timestamp).

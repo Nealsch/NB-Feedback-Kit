@@ -4,7 +4,7 @@
 
 | Step | Limit | Items |
 |------|-------|-------|
-| Step 0 - To Be Started | ∞ | |
+| Step 0 - To Be Started | ∞ | TASK-015, TASK-016, TASK-017, TASK-018, TASK-019 |
 | Step 1 - Discovery | 3 | |
 | Step 2 - Ready | ∞ | |
 | Step 3 - In Development | 1 | |
@@ -69,6 +69,115 @@
 ---
 
 ## To Be Started
+
+### TASK-015: Resolve `shared-types` Workspace Dependency for core-sdk
+- **Status:** To Be Started
+- **Priority:** High (Blocks publish — TASK-016)
+- **Owner:** NB-DevOps-Engineer + NB-Backend-Specialist
+- **Type:** Infrastructure
+- **Created:** 2026-07-07
+- **Dependencies:** None (core-sdk package exists in working tree)
+- **Scope:** The new `@nb-feedback-kit/core-sdk` package depends on `@nb-feedback-kit/shared-types` via `"workspace:*"`. This specifier only resolves inside the monorepo — an external `npm install` would fail. Resolve this before publishing so external consumers can install cleanly.
+- **Context:** core-sdk was created during the FreeToolWorks integration session (2026-07-07). The React SDK doesn't have this problem because it is consumed via workspace only. core-sdk must be independently installable.
+- **Acceptance Criteria:**
+  - [ ] Decision recorded: bundle-and-inline `shared-types` into core-sdk's build output (recommended, lower friction) OR publish `shared-types` to npm as a separate public package.
+  - [ ] If bundling: tsup config updated to inline the dependency; `package.json` `dependencies` no longer references `workspace:*`.
+  - [ ] If publishing: `shared-types` published first; core-sdk references a concrete version (e.g. `^1.0.0`).
+  - [ ] `pnpm build` from repo root succeeds.
+  - [ ] Verified: a clean `npm pack` output of core-sdk contains no `workspace:*` references.
+- **Record:** `memory/tasks/items/TASK-015-resolve-shared-types-dep.md` (to be created)
+
+### TASK-016: Commit and Publish `@nb-feedback-kit/core-sdk` to npm
+- **Status:** To Be Started
+- **Priority:** High (Unblocks external availability)
+- **Owner:** NB-DevOps-Engineer
+- **Type:** Release
+- **Created:** 2026-07-07
+- **Dependencies:** TASK-015 (workspace dep must be resolved first)
+- **Scope:** The core-sdk source, tests (21/21 passing), and build artifacts exist locally but are uncommitted and unpublished. This task makes the package available to external developers via the npm registry.
+- **Context:** Currently `version: "0.0.1"`. The README's `npm install @nb-feedback-kit/core-sdk` instruction fails until this task completes. `publishConfig.access: public` is already set.
+- **Acceptance Criteria:**
+  - [ ] core-sdk changes committed to the `NB-Feedback-Kit` repo and pushed to `origin`.
+  - [ ] Version bumped from `0.0.1` to a release version (e.g. `0.1.0`) following semver.
+  - [ ] `CHANGELOG.md` entry added (or changeset consumed via the existing TASK-013 changeset flow).
+  - [ ] `pnpm publish --filter @nb-feedback-kit/core-sdk --access public` succeeds.
+  - [ ] Verified: `npm view @nb-feedback-kit/core-sdk` returns the published manifest.
+  - [ ] Verified: `npm install @nb-feedback-kit/core-sdk` in a clean external directory resolves and imports `createFeedbackClient`.
+  - [ ] Backend Worker confirmed deployed so the SDK has a live endpoint to talk to (coordinate with TASK-004/005 deployment).
+- **Record:** `memory/tasks/items/TASK-016-publish-core-sdk.md` (to be created)
+
+### TASK-017: Standalone Vanilla-JS Demo UI for core-sdk
+- **Status:** To Be Started
+- **Priority:** Medium
+- **Owner:** NB-Frontend-Web-Specialist
+- **Type:** Feature Development
+- **Created:** 2026-07-07
+- **Dependencies:** TASK-016 (core-sdk must be installable/loadable)
+- **Scope:** Create a framework-agnostic reference UI that developers using non-React stacks (vanilla JS, Vue, Svelte, Angular, Eleventy, plain HTML) can copy as a starting point. This is the generic equivalent of the React demo app (TASK-007) — a drop-in button + modal wired to the core-sdk client.
+- **Context:** A bespoke version of this was already built for the FreeToolWorks site (`src/assets/js/feedback-widget.js` + `src/assets/css/feedback-widget.css`). That implementation is project-specific (tied to FreeToolWorks' design tokens and Eleventy config). This task extracts a reusable, dependency-free reference implementation into the NB-Feedback-Kit repo so other developers can adapt it.
+- **Deliverables:**
+  - [ ] `apps/vanilla-demo/` (or `examples/vanilla/`) directory with a standalone HTML page.
+  - [ ] `feedback-widget.js` — generic vanilla-JS UI (floating button + modal), no framework deps, consuming `NbFeedbackKit.createFeedbackClient` from the IIFE build.
+  - [ ] `feedback-widget.css` — self-contained styles using CSS custom properties (no hardcoded design tokens) so consumers can theme via `--nb-feedback-*` variables.
+  - [ ] `index.html` — minimal demo wiring the widget to a config object, loadable by opening the file directly (no build step).
+  - [ ] `README.md` — how to copy the three files into any project and configure.
+  - [ ] Form types (bug / feature / feedback), validation, loading state, success/error display.
+  - [ ] Keyboard accessibility (ESC to close, focus trap, ARIA labels) matching the React modal's behaviour.
+- **Acceptance Criteria:**
+  - [ ] Demo opens by double-clicking `index.html` — no server, no bundler required.
+  - [ ] Submitting feedback calls `client.submitFeedback()` and shows success/error state.
+  - [ ] All three feedback types selectable.
+  - [ ] Works in evergreen Chrome, Firefox, Safari.
+  - [ ] Documented copy-paste integration path (≤ 5 minutes to add to a plain HTML site).
+- **Record:** `memory/tasks/items/TASK-017-vanilla-demo-ui.md` (to be created)
+
+### TASK-018: Update README and Docs for core-sdk
+- **Status:** To Be Started
+- **Priority:** Medium
+- **Owner:** NB-Frontend-Web-Specialist (docs) + NB-Backend-Specialist (API contract)
+- **Type:** Documentation
+- **Created:** 2026-07-07
+- **Dependencies:** TASK-016 (docs should reflect the published package name/version)
+- **Scope:** The repo's root README and `docs/` suite were written for the React SDK only. Update them so the framework-agnostic core-sdk is a first-class documented option alongside the React SDK. The per-package `packages/core-sdk/README.md` already exists and is comprehensive — this task is about surfacing it from the top-level docs.
+- **Context:** The 2026-07-06 docs session (handoff `handoff-2026-07-06-readme-and-docs.md`) produced a premium README + `docs/` suite but predates core-sdk's creation. External developers arriving at the repo currently see no mention of the non-React option.
+- **Deliverables:**
+  - [ ] Root `README.md` — add a "Framework support" or "Which package do I need?" section: React → `@nb-feedback-kit/react-sdk`; anything else → `@nb-feedback-kit/core-sdk`.
+  - [ ] `docs/installation.md` — add core-sdk install + the three build formats (ESM / CJS / IIFE).
+  - [ ] `docs/core-sdk.md` (new) — quick start, `<script>`-tag usage, full API reference, storage providers. Can mirror `packages/core-sdk/README.md` with repo-relative links.
+  - [ ] `docs/getting-started.md` — branch the quick start: "Using React?" vs "Using another framework or vanilla JS?".
+  - [ ] `docs/examples.md` — add a vanilla-JS example (cross-links to TASK-017 demo).
+  - [ ] Root `README.md` feature/comparison tables updated if they imply React-only.
+  - [ ] `CHANGELOG.md` — entry for core-sdk addition.
+- **Acceptance Criteria:**
+  - [ ] A developer reading only the root README can determine which package to install for their stack.
+  - [ ] No broken internal links (verify all `docs/*.md` cross-references resolve).
+  - [ ] Per-package README (`packages/core-sdk/README.md`) and root docs are consistent — no contradictory API descriptions.
+  - [ ] Pronoun voice matches repo convention (first-person "I/Neal" per the 2026-07-06 docs decision).
+- **Record:** `memory/tasks/items/TASK-018-core-sdk-docs.md` (to be created)
+
+### TASK-019: Expand core-sdk Unit Test Coverage
+- **Status:** To Be Started
+- **Priority:** Medium
+- **Owner:** NB-QA-Engineer
+- **Type:** Quality / Testing
+- **Created:** 2026-07-07
+- **Dependencies:** None (tests can be added to the existing package immediately)
+- **Scope:** The current 21 tests cover only `client.ts` (`submitFeedback`, `getReleases`, `getRoadmap`, `FeedbackApiError`) and basic config validation. Per `.clinerules/testing.md`, all logic-bearing modules need happy-path + edge-case + failure-case coverage. The storage layer, metadata utilities, and IIFE build artefact are currently untested.
+- **Context:** Test gaps identified during the FreeToolWorks integration session. The React SDK's storage providers have integration coverage via component tests, but core-sdk's copies are exercised only indirectly.
+- **Test gaps to close:**
+  - [ ] **`storage/none-provider.ts`** — happy path (returns null/no-ops), edge cases (called with no config), confirms it never throws.
+  - [ ] **`storage/custom-endpoint-provider.ts`** — happy path (upload returns `UploadedFile`), failure cases (endpoint 4xx/5xx, network error, malformed response), edge cases (missing endpoint config, empty file).
+  - [ ] **`storage/providers/s3.ts`** — happy path (presign → PUT → returns `UploadedFile`), failure cases (presign 403, PUT 500, wrong content-type), edge cases (large file, zero-byte file, missing presign response fields).
+  - [ ] **`storage/index.ts`** (`createStorageProvider`) — branch coverage: `none` / `custom` / `s3` selection, invalid type throws, default behaviour when `storage` omitted.
+  - [ ] **`utils/metadata.ts`** (`collectMetadata`) — happy path (returns object with expected keys), edge cases (no `navigator`/`window` available — SSR safety), sanitisation of unexpected UA strings.
+  - [ ] **IIFE build smoke test** — load `dist/index.global.js` in a jsdom/happy-dom environment, assert `window.NbFeedbackKit.createFeedbackClient` is a function. Guards against tsup global-name regressions.
+- **Acceptance Criteria:**
+  - [ ] All listed modules have dedicated test files under `packages/core-sdk/tests/`.
+  - [ ] Each module has ≥ 1 happy-path, ≥ 1 edge-case, ≥ 1 failure-case test.
+  - [ ] `pnpm --filter @nb-feedback-kit/core-sdk test` passes with the new tests added.
+  - [ ] Coverage of `packages/core-sdk/src/` increases measurably (record before/after line counts if a coverage reporter is configured).
+  - [ ] No network calls in any test (all `fetch` stubbed).
+- **Record:** `memory/tasks/items/TASK-019-core-sdk-test-coverage.md` (to be created)
 
 ### TASK-003: SDK UI Components (Feedback Button + Modal)
 - **Status:** Complete
@@ -376,7 +485,7 @@ See `memory/tasks/items/` for detailed records of each work item.
 
 **Delivery Risk:** Low — project is in setup phase, architecture decisions finalized via NB-Grill.
 
-**Active Blockers:** None.
+**Active Blockers:** `@nb-feedback-kit/core-sdk` is not yet available to external developers — TASK-015 (resolve `workspace:*` dependency) blocks TASK-016 (npm publish).
 
 **Documentation Status:** 
 - Project definition ✅
@@ -436,5 +545,6 @@ The MVP is considered complete when:
 
 ---
 
-## 🎉 ALL 13 TASKS COMPLETE — MVP DELIVERED
-2026-06-28 (TASK-006 marked complete — GitHub integration verified, final task done)
+## Post-MVP: Framework-Agnostic SDK
+
+The original 14 MVP tasks are complete. Five follow-up tasks (TASK-015 → TASK-019) track the work needed to publish and support the new framework-agnostic `@nb-feedback-kit/core-sdk`, created during the FreeToolWorks integration session (2026-07-07). These are currently in "To Be Started".

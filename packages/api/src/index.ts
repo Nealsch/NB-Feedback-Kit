@@ -7,6 +7,7 @@ import type { FeedbackConfig } from './types';
 import type { FeedbackPayload } from '@nb-feedback-kit/shared-types';
 import type { ApiEnv } from './env';
 import { createGitHubIssue, getReleases, getRoadmap } from './github/client';
+import { resolveGitHubToken } from './github/app-auth';
 import { handlePresign } from './storage/presign';
 import { handleUpload } from './storage/uploads';
 import { handleRegister, handleRevoke, handleActivate } from './auth/register';
@@ -122,16 +123,6 @@ app.use('/api/*', createAuthMiddleware());
 app.post('/api/feedback', async (c) => {
   const config = c.get('feedbackConfig') as FeedbackConfig;
   const env = c.env as unknown as ApiEnv;
-  const githubToken = env.GITHUB_TOKEN;
-
-  if (!githubToken) {
-    console.error('GITHUB_TOKEN secret not configured');
-    return c.json({
-      success: false,
-      error: 'Server configuration error: GitHub token not set',
-      timestamp: new Date().toISOString(),
-    }, 500);
-  }
 
   let payload: FeedbackPayload;
   try {
@@ -199,6 +190,19 @@ app.post('/api/feedback', async (c) => {
   // body, so we rebuild the array from validated primitives.
   payload = sanitizeAttachments(payload);
 
+  let githubToken: string;
+  try {
+    githubToken = await resolveGitHubToken(env, config.github);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ GitHub token resolution failed:', message);
+    return c.json({
+      success: false,
+      error: 'Server configuration error: GitHub authentication not configured',
+      timestamp: new Date().toISOString(),
+    }, 500);
+  }
+
   try {
     const result = await createGitHubIssue(githubToken, config.github, payload);
 
@@ -231,12 +235,16 @@ app.post('/api/feedback', async (c) => {
 app.get('/api/releases', async (c) => {
   const config = c.get('feedbackConfig') as FeedbackConfig;
   const env = c.env as unknown as ApiEnv;
-  const githubToken = env.GITHUB_TOKEN;
 
-  if (!githubToken) {
+  let githubToken: string;
+  try {
+    githubToken = await resolveGitHubToken(env, config.github);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ GitHub token resolution failed:', message);
     return c.json({
       success: false,
-      error: 'Server configuration error: GitHub token not set',
+      error: 'Server configuration error: GitHub authentication not configured',
       timestamp: new Date().toISOString(),
     }, 500);
   }
@@ -270,12 +278,16 @@ app.get('/api/releases', async (c) => {
 app.get('/api/roadmap', async (c) => {
   const config = c.get('feedbackConfig') as FeedbackConfig;
   const env = c.env as unknown as ApiEnv;
-  const githubToken = env.GITHUB_TOKEN;
 
-  if (!githubToken) {
+  let githubToken: string;
+  try {
+    githubToken = await resolveGitHubToken(env, config.github);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('❌ GitHub token resolution failed:', message);
     return c.json({
       success: false,
-      error: 'Server configuration error: GitHub token not set',
+      error: 'Server configuration error: GitHub authentication not configured',
       timestamp: new Date().toISOString(),
     }, 500);
   }

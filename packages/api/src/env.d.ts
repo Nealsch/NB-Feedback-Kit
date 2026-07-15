@@ -23,7 +23,30 @@ interface KVNamespace {
 export interface ApiEnv {
   API_KEYS: KVNamespace;
   RATE_LIMITER: DurableObjectNamespace;
-  GITHUB_TOKEN: string;
+
+  // ----- GitHub authentication -----------------------------------------------
+  //
+  // Two schemes are supported. GitHub App auth (preferred) uses short-lived
+  // installation tokens minted from the App's private key — no long-lived
+  // PAT to rotate. The legacy `GITHUB_TOKEN` PAT remains as a fallback for
+  // deployments that haven't created a GitHub App yet. See
+  // `src/github/app-auth.ts` for the resolution logic.
+  /**
+   * GitHub App ID (numeric). When set together with
+   * {@link GITHUB_APP_PRIVATE_KEY}, enables GitHub App authentication.
+   */
+  GITHUB_APP_ID?: string;
+  /**
+   * PEM-encoded RSA private key for the GitHub App. Newlines may be stored
+   * as literal `\n` escape sequences (normalised at import time) or as real
+   * newlines. Set via `wrangler secret put`.
+   */
+  GITHUB_APP_PRIVATE_KEY?: string;
+  /**
+   * Static GitHub Personal Access Token (legacy fallback). Used only when
+   * {@link GITHUB_APP_ID} / {@link GITHUB_APP_PRIVATE_KEY} are not set.
+   */
+  GITHUB_TOKEN?: string;
 
   // ----- FEEDBACK-2: anonymous device registration + JWT auth -----------------
   //

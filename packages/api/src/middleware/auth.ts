@@ -179,6 +179,16 @@ export function createAuthMiddleware(): MiddlewareHandler {
       return jsonError(500, 'Internal server error');
     }
 
+    // Defensive default: if the rateLimit field is missing or invalid in the
+    // KV record (common during testing when entries are created manually),
+    // fall back to a sane default instead of forwarding garbage to the DO.
+    // The DO rejects non-numeric / < 1 limits with a 400 "Invalid limit"
+    // response — which previously was mis-surfaced to the client as a 429.
+    const effectiveLimit =
+      typeof config.rateLimit === 'number' && config.rateLimit >= 1
+        ? config.rateLimit
+        : 60; // default: 60 requests per minute
+
     // Each identity (deviceId or apiKey) gets its own DO instance for isolated
     // rate limiting. FEEDBACK-3: migrated devices are limited individually.
     const doId = env.RATE_LIMITER.idFromName(rateLimitKey);
@@ -187,10 +197,11 @@ export function createAuthMiddleware(): MiddlewareHandler {
     const rateLimitResult = await stub.fetch('http://internal/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ limit: config.rateLimit }),
+      body: JSON.stringify({ limit: effectiveLimit }),
     });
 
-    if (!rateLimitResult.ok) {
+    if (rateLimitResult.status === 429) {
+      // Genuinely rate limited — propagate the 429 with reset metadata.
       const resetAt = rateLimitResult.headers.get('X-RateLimit-Reset') || 'unknown';
       return new Response(
         JSON.stringify({
@@ -202,6 +213,19 @@ export function createAuthMiddleware(): MiddlewareHandler {
         }),
         { status: 429, headers: { 'Content-Type': 'application/json' } },
       );
+    }
+
+    if (!rateLimitResult.ok) {
+      // The DO returned a non-2xx, non-429 status (e.g. 400 "Invalid limit",
+      // 404, 405). This is a server-side config or routing issue — NOT rate
+      // limiting. Previously this branch returned a misleading 429, masking
+      // the real problem. Surface a 500 and log the DO's response so the
+      // operator can diagnose via `wrangler tail`.
+      const doBody = await rateLimitResult.text().catch(() => '');
+      console.error(
+        `[auth] Rate limiter DO returned unexpected status ${rateLimitResult.status}: ${doBody}`,
+      );
+      return jsonError(500, 'Internal server error');
     }
 
     // --- Attach to context for downstream handlers ---------------------------

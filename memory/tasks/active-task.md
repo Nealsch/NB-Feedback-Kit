@@ -1,13 +1,59 @@
 # Active Task
 
 ## Current
-**Session In Progress** — 2026-07-06, 09:50 AM
+**Session In Progress** — 2026-07-07, 08:34 PM
 
-Follow-up documentation task for the storage-provider agnosticism work. Wrote
-a comprehensive CORS configuration guide (`packages/api/S3_CORS_CONFIGURATION.md`)
-that operators deploy S3-compatible providers (AWS S3, Cloudflare R2, MinIO,
-Backblaze B2) will need to configure on their buckets. Resolved open item #4
-(CORS documentation) from the 2026-07-05 session.
+Resolved the GitHub App PEM key issue that was causing the dev Worker
+(`nb-feedback-api-dev`) to return HTTP 500 on all GitHub-authenticated
+endpoints (`/api/feedback`, `/api/releases`, `/api/roadmap`). Two root
+causes found and fixed: (1) a truncated `GITHUB_APP_PRIVATE_KEY` secret,
+and (2) a PKCS#1/PKCS#8 format mismatch in `importPrivateKey()`. Deployed
+the fix and verified end-to-end with a live `GET /api/releases` request
+returning HTTP 200.
+
+---
+
+## Session Summary — 2026-07-07
+
+### Objective
+Resolve the GitHub App authentication failure on the deployed dev Worker
+that caused HTTP 500 "Server configuration error: GitHub authentication not
+configured" on every endpoint calling `resolveGitHubToken()`.
+
+### Completed Today
+
+**GitHub App PEM key fix** ✅
+- **Root Cause #1 — Truncated secret:** Re-set `GITHUB_APP_PRIVATE_KEY` from
+  the complete `.pem` file (1675 bytes, full `BEGIN/END RSA PRIVATE KEY`).
+- **Root Cause #2 — PKCS#1/PKCS#8 mismatch:** Fixed
+  `importPrivateKey()` in `packages/api/src/github/app-auth.ts` to detect
+  PKCS#1 keys (`BEGIN RSA PRIVATE KEY`) and wrap them into the PKCS#8
+  `SEQUENCE { algorithm, key }` ASN.1 structure before calling
+  `crypto.subtle.importKey(..., 'pkcs8', ...)`.
+- **Deployed:** `pnpm exec wrangler deploy --env development` —
+  `nb-feedback-api-dev`, Version `bf0b16fb-6fa6-4c59-b3fd-4d6aab27ad1b`.
+- **Verified:** `GET /api/releases` (with a throwaway API key in remote KV)
+  returned `{"success":true,"releases":[]}` with HTTP 200. Previously this
+  path returned 500. Throwaway key deleted after verification.
+
+### Files Modified Today
+```
+packages/api/src/github/app-auth.ts   (PKCS#1 → PKCS#8 wrapping in importPrivateKey; exported for testability)
+packages/api/src/github/app-auth.test.ts (NEW — 15 unit tests for importPrivateKey + wrapPkcs1ToPkcs8)
+memory/lessons-learned.md            (2026-07-07 lesson entry)
+memory/tasks/active-task.md          (this file)
+```
+
+### Verification
+- Local Node repro confirmed the `DataError` before the fix.
+- Live Worker endpoint returned HTTP 200 after the fix.
+- No OKF impact (no API contract, docs, pricing, or auth-workflow change —
+  internal crypto normalization only).
+
+### Next Steps
+1. Provision production secrets (`GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`)
+   before the first production deploy.
+2. Continue with the next task on the project board.
 
 ---
 

@@ -18,13 +18,14 @@ Security is the default, not an add-on. NB Feedback Kit was designed around a si
 │                                                             │
 │   CLIENT (untrusted)          │      WORKER (trusted)       │
 │                               │                             │
-│   React / RN app              │   ┌───────────────────┐    │
-│   ├─ apiKey (bootstrap)       │   │ GITHUB_TOKEN      │    │
-│   ├─ JWT (per-device, 1h)     │   │ JWT_SECRET        │    │
-│   ├─ S3 config (non-secret)   │   │ ADMIN_TOKEN       │    │
-│   └─ public screenshot URL    │   │ S3 credentials    │    │
-│                               │   │ R2 bindings       │    │
-│                               │   └───────────────────┘    │
+│   React / RN app              │   ┌──────────────────────┐ │
+│   ├─ apiKey (bootstrap)       │   │ GITHUB_APP_ID        │ │
+│   ├─ JWT (per-device, 1h)     │   │ GITHUB_APP_PRIVATE_… │ │
+│   ├─ S3 config (non-secret)   │   │ JWT_SECRET           │ │
+│   └─ public screenshot URL    │   │ ADMIN_TOKEN          │ │
+│                               │   │ S3 credentials       │ │
+│                               │   │ R2 bindings          │ │
+│                               │   └──────────────────────┘ │
 └───────────────────────────────┼─────────────────────────────┘
                                 │
                     Never crosses this line
@@ -66,14 +67,23 @@ The client is **untrusted**. All input is validated server-side before it touche
 
 ### Boundary 2: Worker ↔ GitHub
 
-The Worker holds the `GITHUB_TOKEN` and makes all GitHub API calls server-side. The token has scoped permissions:
+The Worker authenticates to GitHub via one of two supported methods:
+
+| Method | Credentials stored | Token lifecycle |
+|---|---|---|
+| **GitHub App** (recommended) | `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` | Short-lived installation tokens, minted on demand (~1h TTL) |
+| **Personal Access Token** (legacy) | `GITHUB_TOKEN` | Long-lived until manually rotated |
+
+When the GitHub App credentials are present, the Worker mints a fresh installation token per invocation via the App's JWT-signed assertion. No long-lived GitHub credential is stored. If only `GITHUB_TOKEN` is set, the Worker uses it directly (backward compatibility). If neither is configured, GitHub-backed endpoints return `502`.
+
+Required GitHub permissions (either method):
 
 | Scope | Purpose |
 |---|---|
 | `issues: write` | Create feedback Issues with labels (`bug`/`feature`/`feedback`). |
 | `contents: read` | Fetch Releases and roadmap data. |
 
-The token is never logged, never sent to the client, and never embedded in issue bodies.
+Credentials are never logged, never sent to the client, and never embedded in issue bodies.
 
 ### Boundary 3: Worker ↔ Storage
 
@@ -87,7 +97,9 @@ All sensitive values are encrypted Cloudflare Worker secrets, set via `wrangler 
 
 | Secret | Scope | Stored as |
 |---|---|---|
-| `GITHUB_TOKEN` | GitHub PAT | Worker secret (encrypted at rest) |
+| `GITHUB_APP_ID` | GitHub App numeric ID (recommended) | Worker secret (encrypted at rest) |
+| `GITHUB_APP_PRIVATE_KEY` | GitHub App PEM private key (recommended) | Worker secret (encrypted at rest) |
+| `GITHUB_TOKEN` | GitHub PAT (legacy fallback) | Worker secret (encrypted at rest) |
 | `JWT_SECRET` | HMAC-SHA256 signing key | Worker secret (≥32 chars required) |
 | `ADMIN_TOKEN` | Admin route guard | Worker secret (separate from client auth) |
 | `S3_ACCESS_KEY_ID` | S3 access key | Worker secret |
@@ -270,7 +282,9 @@ See the [Storage Providers guide](storage-providers.md) for CORS policies and pu
 
 ### Secrets
 
-- [ ] `GITHUB_TOKEN` set with scoped permissions (`issues: write`, `contents: read`).
+- [ ] GitHub authentication configured — either:
+  - **GitHub App (recommended):** `GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY` set, App installed on the target repo with `issues: write` + `contents: read`.
+  - **PAT (legacy):** `GITHUB_TOKEN` set with scoped permissions (`issues: write`, `contents: read`).
 - [ ] `JWT_SECRET` is ≥32 characters (use `openssl rand -hex 32`).
 - [ ] `ADMIN_TOKEN` set — admin routes return 503 without it.
 - [ ] `ALLOWED_ORIGINS` set to your specific app origins (not `*`).
@@ -302,8 +316,9 @@ See the [Storage Providers guide](storage-providers.md) for CORS policies and pu
 
 ### GitHub
 
-- [ ] GitHub PAT has minimal required scopes.
-- [ ] PAT is a fine-grained token scoped to specific repos where possible.
+- [ ] GitHub authentication uses minimal required permissions (`issues: write`, `contents: read`).
+- [ ] Prefer GitHub App over PAT — App mints short-lived installation tokens (no long-lived credential to leak).
+- [ ] If using a PAT, it is fine-grained and scoped to specific repos.
 - [ ] Issue labels (`bug`/`feature`/`feedback`) exist in the target repo.
 
 ---

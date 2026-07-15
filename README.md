@@ -4,7 +4,7 @@
 
 # NB Feedback Kit
 
-**Secure, GitHub-native feedback infrastructure for React & React Native.**
+**Secure, GitHub-native feedback infrastructure for React, React Native & any web project.**
 
 Collect in-app feedback, screenshots, issues, roadmaps, and release notes —
 using *your* GitHub, *your* storage, and *your* infrastructure.
@@ -19,6 +19,7 @@ using *your* GitHub, *your* storage, and *your* infrastructure.
 [![TypeScript][ts]](https://www.typescriptlang.org/)
 [![React][react]](https://react.dev/)
 [![React Native][rn]](https://reactnative.dev/)
+[![JavaScript][js]](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Build Status][build]](https://github.com/Nealsch/NB-Feedback-Kit/actions/workflows/ci.yml)
 
 </div>
@@ -74,7 +75,7 @@ Most feedback platforms demand another SaaS account, another dashboard, and anot
 
 NB Feedback Kit is a thin **bridge**, not a replacement for your tools.
 
-1. **Your app** (React or React Native) embeds the SDK.
+1. **Your app** (React, React Native, or any HTML/vanilla JS site) embeds the SDK.
 2. The **SDK** talks only to your **NB Feedback backend**.
 3. The backend creates **GitHub Issues** and reads Releases, labels, and milestones for the roadmap.
 4. Screenshots are streamed to **your S3-compatible object storage**.
@@ -97,6 +98,7 @@ Credentials for GitHub and storage never leave the backend, and the client is ne
 | <img src="assets/icons/smartphone.svg" width="20" /> | **Device Security** | Devices can be authenticated, tracked, and revoked individually. |
 | <img src="assets/icons/atom.svg" width="20" /> | **React** | First-class provider, hooks, and UI components for React. |
 | <img src="assets/icons/smartphone.svg" width="20" /> | **React Native** | Same SDK model for React Native on iOS and Android. |
+| <img src="assets/icons/code.svg" width="20" /> | **Vanilla JS / HTML** | Framework-agnostic IIFE build — add a `<script>` tag and go. No bundler required. |
 | <img src="assets/icons/server.svg" width="20" /> | **Self Hosted** | Deploy the backend anywhere — your laptop, a VPS, or the cloud. |
 | <img src="assets/icons/heart.svg" width="20" /> | **Open Source** | MIT-licensed, transparent, and built for contributions. |
 
@@ -154,7 +156,14 @@ A **single backend** can securely serve multiple applications. Each project is i
 
 ## Installation
 
-Install the SDK with your preferred package manager:
+NB Feedback Kit offers two SDK packages depending on your frontend:
+
+| SDK | Package | Use when |
+|---|---|---|
+| **React SDK** | `@nb-feedback-kit/react-sdk` | Your app uses React 18+ or React Native. |
+| **Core SDK** | `@nb-feedback-kit/core-sdk` | Your project is vanilla JS, HTML, or any non-React framework (Eleventy, Svelte, Vue, Angular, etc.). No bundler required. |
+
+### React / React Native
 
 ```bash
 # npm
@@ -170,7 +179,29 @@ yarn add @nb-feedback-kit/react-sdk
 bun add @nb-feedback-kit/react-sdk
 ```
 
-> **Peer dependencies:** React & React DOM `^18.0.0`. The backend is a separate, self-hostable Cloudflare Worker — see the [Getting Started guide](docs/getting-started.md) for full deployment steps.
+> **Peer dependencies:** React & React DOM `^18.0.0`.
+
+### Vanilla JS / HTML
+
+```bash
+npm install @nb-feedback-kit/core-sdk
+```
+
+Or download the pre-built IIFE bundle (`dist/index.global.js`) and include it via a `<script>` tag — no package manager or bundler needed:
+
+```html
+<script src="/path/to/nb-feedback-kit.global.js"></script>
+<script>
+  const client = NbFeedbackKit.createFeedbackClient({
+    applicationName: 'My Site',
+    version: '1.0.0',
+    apiEndpoint: 'https://nb-feedback-api-prod.your-subdomain.workers.dev',
+    apiKey: 'your-api-key',
+  })
+</script>
+```
+
+> The backend is a separate, self-hostable Cloudflare Worker — see the [Getting Started guide](docs/getting-started.md) for full deployment steps.
 
 ---
 
@@ -217,6 +248,20 @@ Configure S3-compatible storage for screenshots, and surface GitHub Releases and
 
 React Native follows the same `FeedbackProvider` model. See the [React](docs/react.md) and [React Native](docs/react-native.md) guides for hooks, custom UI, and advanced configuration.
 
+### Vanilla JS / HTML Quick Start
+
+For static sites, server-rendered pages, or any project without a React bundler, use the Core SDK's IIFE global build:
+
+```html
+<!-- 1. Load the Core SDK (IIFE global build) -->
+<script src="/assets/js/nb-feedback-kit.global.js"></script>
+
+<!-- 2. Your feedback widget script -->
+<script src="/assets/js/feedback-widget.js"></script>
+```
+
+The global `window.NbFeedbackKit` exposes `createFeedbackClient(config)`, which returns the same submit API as the React SDK. You build your own UI (button + modal) in vanilla JS — see the [HTML / Vanilla JS guide](docs/html.md) for a complete example.
+
 ---
 
 ## Documentation
@@ -228,6 +273,7 @@ React Native follows the same `FeedbackProvider` model. See the [React](docs/rea
 | <img src="assets/icons/server.svg" width="18" /> | [Backend](docs/backend.md) | Deploy and configure the self-hosted backend. |
 | <img src="assets/icons/atom.svg" width="18" /> | [React](docs/react.md) | Provider, hooks, and UI components. |
 | <img src="assets/icons/smartphone.svg" width="18" /> | [React Native](docs/react-native.md) | Mobile integration for iOS and Android. |
+| <img src="assets/icons/code.svg" width="18" /> | [HTML / Vanilla JS](docs/html.md) | Script-tag integration for static sites and non-React projects. |
 | <img src="assets/icons/database.svg" width="18" /> | [Storage Providers](docs/storage-providers.md) | S3, R2, MinIO, B2, and more. |
 | <img src="assets/icons/shield-check.svg" width="18" /> | [Authentication](docs/authentication.md) | Device auth, JWT, and revocation. |
 | <img src="assets/icons/lock.svg" width="18" /> | [Security](docs/security.md) | Threat model and hardening guide. |
@@ -303,4 +349,5 @@ NB Feedback Kit is released under the **[MIT License](LICENSE)**.
 [ts]: https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white
 [react]: https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black
 [rn]: https://img.shields.io/badge/React_Native-61DAFB?style=flat-square&logo=react&logoColor=black
+[js]: https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black
 [build]: https://img.shields.io/github/actions/workflow/status/Nealsch/NB-Feedback-Kit/ci.yml?style=flat-square&branch=main
