@@ -30,6 +30,7 @@ import type { Context } from 'hono';
 import type { ApiEnv } from '../env';
 import { signJWT, JWT_TTL_SECONDS } from './jwt';
 import { hashApiKey } from './hash';
+import { normalizeKvConfig } from './normalize';
 
 /** Shape of the device record persisted in the `DEVICES` KV namespace. */
 export interface DeviceRecord {
@@ -124,6 +125,15 @@ export async function handleRegister(c: Context): Promise<Response> {
     return c.json(errorBody('Invalid API key'), 401);
   }
 
+  // Normalize the KV record — handles legacy `repository` string schema.
+  let normalizedConfig: { applicationName: string; github: { owner: string; repo: string }; rateLimit: number };
+  try {
+    normalizedConfig = normalizeKvConfig(kvConfig as unknown as Record<string, unknown>, '[register]');
+  } catch {
+    console.error('[register] Failed to normalize API key KV record');
+    return c.json(errorBody('Internal server error'), 500);
+  }
+
   // --- 2. Ensure the JWT secret is configured -------------------------------
   if (!env.JWT_SECRET) {
     console.error('JWT_SECRET is not configured');
@@ -171,15 +181,15 @@ export async function handleRegister(c: Context): Promise<Response> {
           ...(JSON.parse(existingRaw) as DeviceRecord),
           // Refresh the config snapshot on every re-register so github/rateLimit
           // updates propagate without requiring the client to re-bootstrap.
-          github: kvConfig.github,
-          rateLimit: kvConfig.rateLimit,
+          github: normalizedConfig.github,
+          rateLimit: normalizedConfig.rateLimit,
           lastSeenAt: now,
         }
       : {
           deviceId,
-          appId: kvConfig.name,
-          github: kvConfig.github,
-          rateLimit: kvConfig.rateLimit,
+          appId: normalizedConfig.applicationName,
+          github: normalizedConfig.github,
+          rateLimit: normalizedConfig.rateLimit,
           createdAt: now,
           lastSeenAt: now,
         };

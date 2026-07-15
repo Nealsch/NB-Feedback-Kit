@@ -84,19 +84,20 @@ id = "81de7b2caa8149db9c6db782148faa64"
 preview_id = "81de7b2caa8149db9c6db782148faa64"
 
 # FEEDBACK-1: native R2 binding for server-mediated screenshot uploads.
-# Create with: wrangler r2 bucket create spherepa-feedback-prod
-# Provision before first production deploy. The bucket must be publicly
-# readable on the `feedback/` prefix for GitHub to render screenshots.
+# NB Toolbox production bucket (independent from SpherePA).
+# Created with: wrangler r2 bucket create nbtoolbox-feedback-prod
+# Public access enabled at: https://pub-808af23b52aa47f58602356ce4d80cd8.r2.dev
 [[env.production.r2_buckets]]
 binding = "R2_BUCKET"
-bucket_name = "spherepa-feedback-prod"
-preview_bucket_name = "spherepa-feedback-prod"
+bucket_name = "nbtoolbox-feedback-prod"
+preview_bucket_name = "nbtoolbox-feedback-prod"
 
 # FEEDBACK-1: set via `wrangler secret put R2_PUBLIC_BASE_URL --env production`.
-# Prefer a custom domain (e.g. https://cdn.spherepa.app) over the R2.dev URL
-# for production.
+# Current value: https://pub-808af23b52aa47f58602356ce4d80cd8.r2.dev
+# (public access URL for the nbtoolbox-feedback-prod bucket).
+# Prefer a custom domain (e.g. https://cdn.nbtoolbox.com) over r2.dev for production.
 # [env.production.vars]
-# R2_PUBLIC_BASE_URL = "https://cdn.spherepa.app"
+# R2_PUBLIC_BASE_URL = "https://cdn.nbtoolbox.com"
 
 [[env.production.durable_objects.bindings]]
 name = "RATE_LIMITER"

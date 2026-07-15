@@ -23,6 +23,7 @@ import type { FeedbackConfig } from '../types';
 import type { ApiEnv } from '../env';
 import { verifyJWT } from '../auth/jwt';
 import { hashApiKey } from '../auth/hash';
+import { normalizeKvConfig } from '../auth/normalize';
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -157,11 +158,14 @@ export function createAuthMiddleware(): MiddlewareHandler {
         return jsonError(401, 'Invalid API key');
       }
 
-      config = {
-        applicationName: keyData.name,
-        github: keyData.github,
-        rateLimit: keyData.rateLimit,
-      };
+      // Normalize the KV record — handles both legacy `repository` string and
+      // current `github` object schemas (see auth/normalize.ts).
+      try {
+        config = normalizeKvConfig(keyData as unknown as Record<string, unknown>);
+      } catch {
+        console.error('[auth] Failed to normalize API key KV record');
+        return jsonError(500, 'Internal server error');
+      }
       // Legacy path: rate limit is per-key (no deviceId available).
       rateLimitKey = apiKey;
       deviceId = '';
